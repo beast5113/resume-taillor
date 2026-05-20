@@ -28,8 +28,5 @@ export interface TemplateInfo {
 }
 
 export const TEMPLATES: TemplateInfo[] = [
-  { id: "classic",   name: "Classic",   description: "Centered header · Montserrat headers · traditional" },
-  { id: "modern",    name: "Modern",    description: "Left-aligned · blue accent borders · Calibri" },
-  { id: "executive", name: "Executive", description: "Bold centered · double-rule header · formal" },
-  { id: "minimal",   name: "Minimal",   description: "Clean typography · no heavy borders · spacious" },
+  { id: "classic", name: "Classic", description: "Centered header · Montserrat headers · traditional" },
 ];

@@ -4,8 +4,12 @@ import { SESSION_COOKIE, computeToken, timingSafeEqual, readEnv } from "@/lib/au
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Always allow login page and auth API
-  if (pathname === "/login" || pathname.startsWith("/api/auth/")) {
+  // Always allow login, auth actions, and webhook
+  if (
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth/") ||
+    pathname.startsWith("/api/webhook")
+  ) {
     return NextResponse.next();
   }
 
@@ -13,7 +17,7 @@ export async function proxy(request: NextRequest) {
   const appPassword = readEnv(process.env.APP_PASSWORD);
   const secret = readEnv(process.env.SESSION_SECRET);
 
-  // If credentials are not configured, skip auth
+  // Skip auth if credentials not configured
   if (!appEmail || !appPassword || !secret) {
     return NextResponse.next();
   }

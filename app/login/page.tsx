@@ -1,99 +1,72 @@
 "use client";
 
-import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { login } from "./actions";
+import { FileText } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const submit = async (e: FormEvent) => {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError("");
-
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    if (res.ok) {
-      router.push("/");
-      router.refresh();
-    } else {
-      const data = await res.json().catch(() => ({ message: "Login failed" }));
-      setError(data.message || "Invalid credentials");
+    const fd = new FormData(e.currentTarget);
+    const result = await login(fd);
+    if (result?.error) {
+      setError(result.error);
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center mb-4">
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="bg-card rounded-2xl ring-1 ring-foreground/10 p-8 w-full max-w-sm shadow-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
+            <FileText size={18} className="text-primary-foreground" />
           </div>
-          <h1 className="text-xl font-semibold text-zinc-100">AI Resume Tailor</h1>
-          <p className="text-sm text-zinc-500 mt-1">Sign in to continue</p>
+          <div>
+            <h1 className="text-base font-semibold text-foreground leading-tight">AI Resume Tailor</h1>
+            <p className="text-xs text-muted-foreground">Sign in to your workspace</p>
+          </div>
         </div>
 
-        {/* Card */}
-        <form onSubmit={submit} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="field-label">Email</label>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Email</label>
             <input
-              className="field-input"
+              name="email"
               type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               required
+              autoFocus
+              autoComplete="email"
+              className="field-input"
             />
           </div>
+
           <div>
-            <label className="field-label">Password</label>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Password</label>
             <input
-              className="field-input"
+              name="password"
               type="password"
-              placeholder="••••••••"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
+              className="field-input"
             />
           </div>
 
           {error && (
-            <div className="rounded-lg bg-red-900/30 border border-red-700/50 px-3 py-2 text-sm text-red-300">
-              {error}
-            </div>
+            <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary w-full py-2.5 mt-1"
+            className="w-full h-9 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? (
-              <>
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                </svg>
-                Signing in…
-              </>
-            ) : (
-              "Sign in"
-            )}
+            {loading ? "Signing in…" : "Sign In"}
           </button>
         </form>
       </div>
