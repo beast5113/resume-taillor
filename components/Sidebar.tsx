@@ -11,6 +11,7 @@ import {
   LogOut,
   LayoutDashboard,
   Kanban,
+  LayoutTemplate,
 } from "lucide-react";
 import { logout } from "@/app/actions/logout";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ const NAV = [
   { href: "/profiles",     label: "Profiles",     icon: User },
   { href: "/prompts",      label: "Prompts",      icon: MessageSquare },
   { href: "/contexts",     label: "Contexts",     icon: Layers },
+  { href: "/templates",    label: "Templates",    icon: LayoutTemplate },
   { href: "/generate",     label: "Generate",     icon: Zap },
 ];
 

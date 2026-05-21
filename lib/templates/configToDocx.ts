@@ -69,12 +69,14 @@ function buildSectionHeader(cfg: TemplateConfig, text: string) {
   });
 }
 
-function buildSkillLine(cfg: TemplateConfig, category: string, items: string) {
+function buildSkillBullet(cfg: TemplateConfig, category: string, items: string) {
   const sk = cfg.skills;
+  const b = cfg.bullet;
   return new Paragraph({
-    spacing: { before: twips(sk.spacingBeforePt), after: 0 },
+    numbering: { reference: "bullets", level: 0 },
+    spacing: { before: 0, after: twips(b.spacingAfterPt) },
     children: [
-      new TextRun({ text: category + ": ", font: cfg.body.font, size: hp(sk.sizePt), bold: sk.categoryBold, color: sk.categoryColor }),
+      new TextRun({ text: category + " : ", font: cfg.body.font, size: hp(sk.sizePt), bold: sk.categoryBold, color: sk.categoryColor }),
       new TextRun({ text: items, font: cfg.body.font, size: hp(sk.sizePt), color: sk.valueColor }),
     ],
   });
@@ -113,27 +115,52 @@ function buildBullet(cfg: TemplateConfig, text: string) {
   });
 }
 
-function buildEduEntry(cfg: TemplateConfig, contentW: number, degree: string, school: string, start: string, end: string, gpa?: string) {
+function buildEduEntry(
+  cfg: TemplateConfig,
+  contentW: number,
+  school: string,
+  location: string,
+  degree: string,
+  start: string,
+  end: string,
+  gpa?: string,
+) {
   const e = cfg.education;
-  const gradeRun = gpa ? [new TextRun({ text: `  GPA: ${gpa}`, font: cfg.body.font, size: hp(e.datePt), color: e.gpaColor })] : [];
-  return [
+  const tab = [{ type: TabStopType.RIGHT, position: contentW }];
+
+  const rows: Paragraph[] = [
+    // Row 1: School (bold, left)  |  Location (right)
     new Paragraph({
-      tabStops: [{ type: TabStopType.RIGHT, position: contentW }],
+      tabStops: tab,
       spacing: { before: twips(e.spacingBeforePt), after: 0 },
       children: [
-        new TextRun({ text: degree, font: cfg.body.font, size: hp(e.degreePt), color: e.degreeColor }),
-        new TextRun({ text: "\t", size: hp(e.datePt) }),
-        new TextRun({ text: `${start} – ${end}`, font: cfg.body.font, size: hp(e.datePt), color: e.dateColor }),
+        new TextRun({ text: school,    font: cfg.body.font, size: hp(e.degreePt), bold: e.schoolBold, color: e.schoolColor }),
+        new TextRun({ text: "\t",      size: hp(e.degreePt) }),
+        new TextRun({ text: location,  font: cfg.body.font, size: hp(e.degreePt), color: e.schoolColor }),
       ],
     }),
+    // Row 2: Degree (left)  |  Start – End (right)
     new Paragraph({
+      tabStops: tab,
       spacing: { before: 0, after: 0 },
       children: [
-        new TextRun({ text: school, font: cfg.body.font, size: hp(e.degreePt), bold: e.schoolBold, color: e.schoolColor }),
-        ...gradeRun,
+        new TextRun({ text: degree,              font: cfg.body.font, size: hp(e.degreePt), color: e.degreeColor }),
+        new TextRun({ text: "\t",                size: hp(e.datePt) }),
+        new TextRun({ text: `${start} – ${end}`, font: cfg.body.font, size: hp(e.datePt),   color: e.dateColor }),
       ],
     }),
   ];
+
+  if (gpa) {
+    rows.push(new Paragraph({
+      spacing: { before: 0, after: 0 },
+      children: [
+        new TextRun({ text: `GPA: ${gpa}`, font: cfg.body.font, size: hp(e.datePt), color: e.gpaColor }),
+      ],
+    }));
+  }
+
+  return rows;
 }
 
 export async function buildFromConfig(data: ResumeDocData, config: TemplateConfig): Promise<Buffer> {
@@ -153,7 +180,7 @@ export async function buildFromConfig(data: ResumeDocData, config: TemplateConfi
   }));
 
   children.push(buildSectionHeader(config, "SKILLS"));
-  data.skills.forEach(({ category, items }) => children.push(buildSkillLine(config, category, items)));
+  data.skills.forEach(({ category, items }) => children.push(buildSkillBullet(config, category, items)));
 
   children.push(buildSectionHeader(config, "PROFESSIONAL EXPERIENCE"));
   data.experience.forEach((job) => {
@@ -164,7 +191,7 @@ export async function buildFromConfig(data: ResumeDocData, config: TemplateConfi
 
   children.push(buildSectionHeader(config, "EDUCATION"));
   data.education.forEach((edu) =>
-    buildEduEntry(config, contentW, edu.degree, edu.school, edu.startDate, edu.endDate, edu.gpa)
+    buildEduEntry(config, contentW, edu.school, edu.location ?? "", edu.degree, edu.startDate, edu.endDate, edu.gpa)
       .forEach((p) => children.push(p))
   );
 

@@ -15,6 +15,7 @@ export interface ResumeDocData {
   education: {
     degree: string;
     school: string;
+    location: string;
     startDate: string;
     endDate: string;
     gpa?: string;

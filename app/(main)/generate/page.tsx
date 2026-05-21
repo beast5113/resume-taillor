@@ -55,8 +55,6 @@ export default function GeneratePage() {
       return;
     }
 
-    const { email, location, linkedin } = resumeData;
-    const contact = [email, location, linkedin].filter(Boolean).join("  •  ");
     const selectedPrompt = prompts.find((p) => p.id === promptId);
     const selectedContext = contexts.find((c) => c.id === contextId);
 
@@ -65,7 +63,7 @@ export default function GeneratePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          resumeData: { ...resumeData, contact },
+          resumeData,
           jobDescription,
           promptContent: selectedPrompt?.content,
           contextContent: selectedContext?.content,
