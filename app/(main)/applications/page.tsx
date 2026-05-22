@@ -90,13 +90,11 @@ function buildPageRange(current: number, total: number): (number | "…")[] {
 
 function CopyButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
-
   const handleCopy = async () => {
     await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
-
   return (
     <button
       onClick={handleCopy}
@@ -105,6 +103,53 @@ function CopyButton({ url }: { url: string }) {
     >
       {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
     </button>
+  );
+}
+
+function ActionButtons({
+  app,
+  deletingId,
+  onOpenJd,
+  onDelete,
+}: {
+  app: Application;
+  deletingId: string | null;
+  onOpenJd: (app: Application) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 flex-nowrap">
+      <button
+        onClick={() => onOpenJd(app)}
+        title="View job description"
+        className="inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
+      >
+        <FileText size={12} />
+      </button>
+      {app.job_url && <CopyButton url={app.job_url} />}
+      {app.status === "completed" && app.google_drive_file_id && (
+        <>
+          <a
+            href={`https://drive.google.com/uc?export=download&id=${app.google_drive_file_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-all"
+          >
+            <Download size={12} />
+            <span>Download</span>
+          </a>
+        </>
+      )}
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        onClick={() => onDelete(app.id)}
+        disabled={deletingId === app.id}
+        className="text-muted-foreground hover:text-destructive"
+      >
+        <Trash2 size={13} />
+      </Button>
+    </div>
   );
 }
 
@@ -132,7 +177,6 @@ export default function ApplicationsPage() {
   useEffect(() => {
     let isActive = true;
     load();
-
     const interval = setInterval(async () => {
       const res = await fetch("/api/applications");
       if (!res.ok) return;
@@ -147,11 +191,7 @@ export default function ApplicationsPage() {
         clearInterval(interval);
       }
     }, 5000);
-
-    return () => {
-      isActive = false;
-      clearInterval(interval);
-    };
+    return () => { isActive = false; clearInterval(interval); };
   }, [load]);
 
   const handleDelete = async (id: string) => {
@@ -190,9 +230,7 @@ export default function ApplicationsPage() {
     const q = search.toLowerCase().trim();
     if (!q) return applications;
     return applications.filter(
-      (a) =>
-        a.company_name.toLowerCase().includes(q) ||
-        a.role.toLowerCase().includes(q)
+      (a) => a.company_name.toLowerCase().includes(q) || a.role.toLowerCase().includes(q)
     );
   }, [applications, search]);
 
@@ -200,18 +238,15 @@ export default function ApplicationsPage() {
   const currentPage = Math.min(page, totalPages);
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const handleSearch = (value: string) => {
-    setSearch(value);
-    setPage(1);
-  };
+  const handleSearch = (value: string) => { setSearch(value); setPage(1); };
 
   return (
     <div className="h-full flex flex-col">
       {/* Page header */}
-      <div className="px-8 py-6 border-b border-border flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Applications</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
+      <div className="px-4 sm:px-8 py-4 sm:py-6 border-b border-border flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-lg font-semibold text-foreground">Applications</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
             Jobs submitted via Chrome extension — resumes generated and stored on Google Drive
           </p>
         </div>
@@ -219,18 +254,19 @@ export default function ApplicationsPage() {
           variant="outline"
           size="sm"
           onClick={() => { setLoading(true); load(); }}
+          className="shrink-0"
         >
           <RefreshCw size={13} />
-          Refresh
+          <span className="hidden sm:inline">Refresh</span>
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-8 py-6">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-4 sm:py-6">
         <div className="space-y-4">
 
           {/* Search bar */}
           {!loading && applications.length > 0 && (
-            <div className="relative max-w-72">
+            <div className="relative w-full sm:max-w-72">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               <Input
                 placeholder="Search company or role…"
@@ -250,7 +286,7 @@ export default function ApplicationsPage() {
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground space-y-3">
               <Inbox size={40} className="text-muted-foreground/30" />
               <p className="text-sm">No applications yet</p>
-              <p className="text-xs text-muted-foreground/60">
+              <p className="text-xs text-muted-foreground/60 text-center px-4">
                 Submit a job via your Chrome extension to get started
               </p>
             </div>
@@ -261,7 +297,8 @@ export default function ApplicationsPage() {
             </div>
           ) : (
             <>
-              <div className="bg-card rounded-xl ring-1 ring-foreground/10 overflow-hidden">
+              {/* ── Desktop table (md+) ───────────────────────── */}
+              <div className="hidden md:block bg-card rounded-xl ring-1 ring-foreground/10 overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
@@ -277,9 +314,7 @@ export default function ApplicationsPage() {
                   <tbody className="divide-y divide-border">
                     {paginated.map((app) => (
                       <tr key={app.id} className="hover:bg-accent/30 transition-colors">
-                        <td className="px-4 py-3.5 text-muted-foreground text-xs tabular-nums">
-                          {app.seq}
-                        </td>
+                        <td className="px-4 py-3.5 text-muted-foreground text-xs tabular-nums">{app.seq}</td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-1.5">
                             <span className="font-medium text-foreground whitespace-nowrap">{app.company_name}</span>
@@ -296,7 +331,9 @@ export default function ApplicationsPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-muted-foreground whitespace-nowrap">{app.role}</td>
+                        <td className="px-4 py-3.5 text-muted-foreground max-w-0 w-full">
+                          <div className="truncate" title={app.role}>{app.role}</div>
+                        </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2">
                             <Badge variant={STATUS_VARIANT[app.status]} className="capitalize gap-1">
@@ -334,46 +371,14 @@ export default function ApplicationsPage() {
                           </Select>
                         </td>
                         <td className="px-4 py-3.5 text-muted-foreground text-xs whitespace-nowrap">{formatDate(app.created_at)}</td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => openJd(app)}
-                              title="View job description"
-                              className="inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
-                            >
-                              <FileText size={12} />
-                            </button>
-                            {app.job_url && <CopyButton url={app.job_url!} />}
-                            {app.status === "completed" && app.google_drive_file_id && (
-                              <>
-                                <a
-                                  href={`/api/applications/${app.id}/download`}
-                                  className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-all"
-                                >
-                                  <Download size={12} />
-                                  Download
-                                </a>
-                                {app.google_drive_link && (
-                                  <a
-                                    href={app.google_drive_link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
-                                  >
-                                    <ExternalLink size={12} />
-                                  </a>
-                                )}
-                              </>
-                            )}
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              onClick={() => setConfirmDeleteId(app.id)}
-                              disabled={deletingId === app.id}
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 size={13} />
-                            </Button>
+                            <ActionButtons
+                              app={app}
+                              deletingId={deletingId}
+                              onOpenJd={openJd}
+                              onDelete={(id) => setConfirmDeleteId(id)}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -382,8 +387,84 @@ export default function ApplicationsPage() {
                 </table>
               </div>
 
+              {/* ── Mobile cards (< md) ───────────────────────── */}
+              <div className="md:hidden space-y-3">
+                {paginated.map((app) => (
+                  <div
+                    key={app.id}
+                    className="bg-card rounded-xl ring-1 ring-foreground/10 p-4 space-y-3"
+                  >
+                    {/* Row 1: seq + company + status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-muted-foreground tabular-nums">#{app.seq}</span>
+                          <span className="font-semibold text-foreground text-sm truncate">{app.company_name}</span>
+                          {app.job_url && (
+                            <a
+                              href={app.job_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-primary transition-colors shrink-0"
+                            >
+                              <ExternalLink size={11} />
+                            </a>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{app.role}</p>
+                      </div>
+                      <Badge variant={STATUS_VARIANT[app.status]} className="capitalize gap-1 shrink-0">
+                        {(app.status === "generating" || app.status === "pending") && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+                        )}
+                        {app.status}
+                      </Badge>
+                    </div>
+
+                    {/* Error message */}
+                    {app.status === "failed" && app.error_message && (
+                      <p className="text-xs text-destructive truncate">{app.error_message}</p>
+                    )}
+
+                    {/* Row 2: stage + date */}
+                    <div className="flex items-center justify-between gap-2">
+                      <Select
+                        value={app.pipeline_status}
+                        onValueChange={(val) => val && handlePipelineChange(app.id, val)}
+                        disabled={updatingId === app.id}
+                      >
+                        <SelectTrigger
+                          size="sm"
+                          className={`border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 h-6 text-xs font-medium w-auto ${PIPELINE_COLORS[app.pipeline_status] ?? "text-foreground"}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent align="start">
+                          {PIPELINE_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-muted-foreground shrink-0">{formatDate(app.created_at)}</span>
+                    </div>
+
+                    {/* Row 3: actions */}
+                    <div className="pt-1 border-t border-border">
+                      <ActionButtons
+                        app={app}
+                        deletingId={deletingId}
+                        onOpenJd={openJd}
+                        onDelete={(id) => setConfirmDeleteId(id)}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               {/* Pagination footer */}
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span>
                   {filtered.length} application{filtered.length !== 1 ? "s" : ""}
                   {search && ` matching "${search}"`}
@@ -426,21 +507,21 @@ export default function ApplicationsPage() {
       >
         <Dialog.Portal>
           <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 duration-150" />
-          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[80vh] bg-card rounded-xl ring-1 ring-foreground/10 shadow-xl flex flex-col data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-              <div>
+          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-2xl max-h-[85vh] bg-card rounded-xl ring-1 ring-foreground/10 shadow-xl flex flex-col data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
+            <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-border shrink-0">
+              <div className="min-w-0">
                 <Dialog.Title className="text-sm font-semibold text-foreground">Job Description</Dialog.Title>
-                <Dialog.Description className="text-xs text-muted-foreground mt-0.5">{jdModal.title}</Dialog.Description>
+                <Dialog.Description className="text-xs text-muted-foreground mt-0.5 truncate">{jdModal.title}</Dialog.Description>
               </div>
               <Dialog.Close
                 render={
-                  <button className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                  <button className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0 ml-2">
                     <X size={14} />
                   </button>
                 }
               />
             </div>
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4">
               {jdModal.loading ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : jdModal.content ? (
@@ -460,7 +541,7 @@ export default function ApplicationsPage() {
       >
         <Dialog.Portal>
           <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 duration-150" />
-          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-card rounded-xl ring-1 ring-foreground/10 shadow-xl p-6 space-y-4 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
+          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-sm bg-card rounded-xl ring-1 ring-foreground/10 shadow-xl p-5 sm:p-6 space-y-4 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
             <div className="flex items-start gap-3">
               <div className="shrink-0 flex items-center justify-center size-9 rounded-full bg-destructive/10">
                 <AlertTriangle size={16} className="text-destructive" />

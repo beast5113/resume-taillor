@@ -8,7 +8,8 @@ export async function proxy(request: NextRequest) {
   if (
     pathname === "/login" ||
     pathname.startsWith("/api/auth/") ||
-    pathname.startsWith("/api/webhook")
+    pathname.startsWith("/api/webhook") ||
+    pathname.startsWith("/api/inngest")
   ) {
     return NextResponse.next();
   }
