@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["docx"],
+  serverExternalPackages: ["docxtemplater", "pizzip"],
 };
 
 export default nextConfig;

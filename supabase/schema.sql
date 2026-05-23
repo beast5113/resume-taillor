@@ -46,23 +46,10 @@ create trigger contexts_updated_at
   before update on contexts
   for each row execute function set_updated_at();
 
-create table if not exists templates (
-  id         uuid        primary key default gen_random_uuid(),
-  name       text        not null,
-  config     jsonb       not null default '{}',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create trigger templates_updated_at
-  before update on templates
-  for each row execute function set_updated_at();
-
 -- Single-user setup: disable RLS (or configure it for your needs)
 alter table profiles  disable row level security;
 alter table prompts   disable row level security;
 alter table contexts  disable row level security;
-alter table templates disable row level security;
 
 create table if not exists applications (
   id                   uuid        primary key default gen_random_uuid(),

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Zap,
-  User,
   MessageSquare,
   Layers,
   Briefcase,
@@ -20,7 +19,6 @@ const NAV = [
   { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
   { href: "/kanban",       label: "Kanban",       icon: Kanban },
   { href: "/applications", label: "Applications", icon: Briefcase },
-  { href: "/profiles",     label: "Profiles",     icon: User },
   { href: "/prompts",      label: "Prompts",      icon: MessageSquare },
   { href: "/contexts",     label: "Contexts",     icon: Layers },
   { href: "/templates",    label: "Templates",    icon: LayoutTemplate },

@@ -12,7 +12,6 @@ interface Application {
   job_url: string | null;
   pipeline_status: string;
   created_at: string;
-  profiles?: { name: string } | null;
 }
 
 const COLUMNS: { id: PipelineStatus; label: string; color: string; dot: string }[] = [
@@ -118,9 +117,7 @@ export default function KanbanPage() {
                         className="bg-background rounded-lg p-3 ring-1 ring-foreground/10 cursor-grab active:cursor-grabbing space-y-2 hover:ring-primary/40 transition-all"
                       >
                         <p className="text-sm font-medium text-foreground leading-tight">{app.role}</p>
-                        {app.profiles?.name && (
-                          <p className="text-xs text-primary">{app.profiles.name}</p>
-                        )}
+
                         <p className="text-xs text-muted-foreground">{app.company_name}</p>
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] text-muted-foreground/60">{formatDate(app.created_at)}</span>

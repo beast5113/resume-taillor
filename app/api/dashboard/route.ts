@@ -9,7 +9,7 @@ const PIPELINE_STATUSES = [
 export async function GET() {
   const { data: apps, error } = await supabase
     .from("applications")
-    .select("id, pipeline_status, profile_id, created_at, profiles(name)")
+    .select("id, pipeline_status, created_at")
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
@@ -22,17 +22,6 @@ export async function GET() {
   const total = apps.length;
   const inProgress = apps.filter((a) => a.pipeline_status !== "offer" && a.pipeline_status !== "failed").length;
   const offers = apps.filter((a) => a.pipeline_status === "offer").length;
-
-  // By account
-  const accountMap = new Map<string, number>();
-  for (const a of apps) {
-    const profile = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles;
-    const name = (profile as { name: string } | null)?.name ?? "Unknown";
-    accountMap.set(name, (accountMap.get(name) ?? 0) + 1);
-  }
-  const byAccount = Array.from(accountMap.entries())
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count);
 
   // By status
   const statusMap = new Map<string, number>(PIPELINE_STATUSES.map((s) => [s, 0]));
@@ -65,5 +54,5 @@ export async function GET() {
   }
   const heatmapCounts = Array.from(heatmapMap.entries()).map(([date, count]) => ({ date, count }));
 
-  return NextResponse.json({ appliedThisWeek, total, inProgress, offers, byAccount, byStatus, dailyCounts, heatmapCounts });
+  return NextResponse.json({ appliedThisWeek, total, inProgress, offers, byStatus, dailyCounts, heatmapCounts });
 }

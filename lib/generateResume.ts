@@ -1,15 +1,7 @@
 import OpenAI from "openai";
-import { ResumeData } from "@/lib/types";
-import { buildResumeBuffer } from "@/lib/buildDocument";
-import type { ResumeDocData } from "@/lib/buildDocument";
+import { supabase } from "@/lib/supabase";
+import { renderDocxTemplate, extractTemplateVariables } from "@/lib/docxTemplater";
 import { isValidModel, DEFAULT_MODEL } from "@/lib/models";
-
-// ─── Fixed content ─────────────────────────────────────────────────────────────
-
-const REMOTE_COLLAB_SKILLS =
-  "Github PR Reviews, Jira, Agile/Scrum ceremonies, Async design documentation, CI/CD – driven releases, Production incident triage in distributed teams";
-
-// ─── System prompt ─────────────────────────────────────────────────────────────
 
 const DEFAULT_SYSTEM_PROMPT = `# ATS Resume Generation Master Prompt
 
@@ -20,33 +12,16 @@ I want you to act as a professional ATS-optimized resume writer.
 Task:
 Generate concise achievement bullet points for each job in the provided employment history, optimized to match the provided job title, job description, and ATS principles.
 
+Given:
+- A list of template variables from a resume template
+- The candidate's background information (existing resume, skills, experience)
+- A target job description
+
 ---
 
 # Resume Achievement Rules
 
-## 1. Use the Standard ATS Format
-
-Change similar or repetitive bullet points.
-
-Every job entry must follow this order:
-
-• Bullet 1
-• Bullet 2
-• Bullet 3
-...
-
-ATS expects this exact structure.
-
-Do not use:
-
-❌ tables
-❌ text boxes
-❌ columns
-❌ images
-
----
-
-## 2. Start Each Bullet with an Action Verb
+## 1. Start Each Bullet with an Action Verb
 
 Change similar or repetitive bullet points.
 
@@ -62,7 +37,7 @@ Absolutely avoid:
 
 ---
 
-## 3. Include Keywords the ATS Checks For
+## 2. Include Keywords the ATS Checks For
 
 Mix in the following keyword types:
 
@@ -95,7 +70,7 @@ This makes your experience score higher for matching.
 
 ---
 
-## 4. Each Bullet Must Contain One Achievement
+## 3. Each Bullet Must Contain One Achievement
 
 Do not merge multiple actions into one bullet.
 
@@ -116,7 +91,7 @@ Action Verb + What You Did + Measurable Impact
 
 ---
 
-## 5. Each Bullet Must Follow the ATS Formula
+## 4. Each Bullet Must Follow the ATS Formula
 
 Best format for maximum ATS + recruiter impact:
 
@@ -129,7 +104,7 @@ Avoid repeating the same action verb more than twice across the resume.
 
 ---
 
-## 6. Use Numbers & Metrics
+## 5. Use Numbers & Metrics
 
 Examples:
 
@@ -148,7 +123,7 @@ Examples:
 
 ---
 
-## 7. Focus on Results + Skill Areas
+## 6. Focus on Results + Skill Areas
 
 High-ranking ATS summaries include:
 
@@ -159,7 +134,7 @@ High-ranking ATS summaries include:
 
 ---
 
-## 8. Past Tense for Previous Jobs
+## 7. Past Tense for Previous Jobs
 
 Use:
 
@@ -169,22 +144,7 @@ Use:
 
 ---
 
-## 9. Use Plain Text Bullets Only
-
-Use:
-
-●
-•
-
-Avoid:
-
-❌ fancy symbols
-❌ emojis
-❌ checkmarks
-
----
-
-## 10. Keep Bullets 1–2 Lines Max
+## 8. Keep Bullets 1–2 Lines Max
 
 Ideal length:
 24–30 words per bullet
@@ -197,7 +157,7 @@ Requirements:
 
 ---
 
-## 11. AI / Timeline Restrictions
+## 9. AI / Timeline Restrictions
 
 If content is based on:
 
@@ -210,7 +170,7 @@ Do not include AI-related work in roles that ended before 2023-12, because those
 
 ---
 
-## 12. Company-Specific Stack Constraints
+## 10. Company-Specific Stack Constraints
 
 Infer from the job's start and end dates which cloud provider and tech stack are plausible:
 
@@ -307,67 +267,45 @@ Only extract what appears in or is directly implied by the job description and t
 
 # Unified Output Format
 
-The employment history is provided in the candidate profile below. Each job lists:
-- bulletCount: how many bullets to generate for that job
-- seeds: seed bullets, each with an optional maxLength character limit
+Generate a value for EVERY variable listed. Rules:
 
-Return ONLY a single valid JSON object — no markdown, no code fences, no extra keys, no comments:
+## Variable naming conventions
+- name, email, phone, location, linkedin, title → use candidate info directly
+- summary → 2-3 sentence professional summary (no first-person)
+- skillset-list or skill-list → comma-separated relevant skills
+- experience-N-M → bullet point M for job N (Action Verb + What + Tools + Impact)
+- education-N-* → education field for entry N
+- Any other variable → generate appropriate resume content based on the name
 
-{
-  "profile_title": "string — 8-10 words, job title + core skills",
-  "professional_summary": "string — 2-3 sentences, no first-person",
-  "technical_skills": ["skill1", "skill2", "skill3"],
-  "tools_and_technologies": ["tool1", "tool2", "tool3"],
-  "experience": [
-    ["bullet 0 for job 1", "bullet 1", "...", "bullet N"],
-    ["bullet 0 for job 2", "...", "bullet N"],
-    ["...one inner array per job, same order as input..."]
-  ]
-}
+## Writing rules
+- Bullet points: Action Verb + What You Did + Tools/Tech + Metric (24-30 words)
+- Use past tense for completed roles
+- No "Responsible for", "Worked on", "Helped with"
+- No first-person pronouns
+- ATS-friendly: match keywords from the job description
 
-Per-bullet length rules:
+Return ONLY a valid JSON object — no markdown, no code fences:
+{ "variable-name": "value", ... }
+Every variable in the list must have a key in the output.`;
 
-* experience[i] must contain exactly bulletCount[i] strings
-* experience[i][j] must NOT exceed seeds[j].maxLength characters when maxLength > 0
-* If a seed has maxLength 0, there is no character limit for that bullet
-* Do not wrap in outer arrays, do not add markdown, do not stringify JSON, do not include additional keys`;
+function buildUserPrompt(
+  variables: string[],
+  backgroundInfo: string,
+  jobDescription: string
+): string {
+  return `Template variables to fill (you must return a value for every one):
+${variables.map((v) => `- ${v}`).join("\n")}
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-function buildUserPrompt(resumeData: ResumeData, jobDescription: string): string {
-  const profileJson = JSON.stringify(
-    {
-      name: resumeData.name,
-      email: resumeData.email,
-      location: resumeData.location,
-      linkedin: resumeData.linkedin,
-      basicSkills: resumeData.basicSkills,
-      employment: resumeData.experience.map((job, i) => ({
-        index: i + 1,
-        company: job.company,
-        location: job.location,
-        title: job.title,
-        startDate: job.startDate,
-        endDate: job.endDate,
-        bulletCount: job.bullets.length,
-        seeds: job.bullets.map((b) => ({ seed: b.text, maxLength: b.maxLength })),
-      })),
-      education: resumeData.education,
-    },
-    null,
-    2
-  );
-
-  return `Candidate profile:
-${profileJson}
+Candidate background:
+${backgroundInfo.trim() || "(not provided — infer reasonable content from the job description)"}
 
 Target job description:
-${jobDescription}
+${jobDescription.trim()}
 
-Generate the optimized resume content JSON.`;
+Return the JSON object now.`;
 }
 
-function extractJson(text: string): Record<string, unknown> {
+function extractJson(text: string): Record<string, string> {
   const trimmed = text.trim();
   try {
     return JSON.parse(trimmed);
@@ -381,59 +319,6 @@ function extractJson(text: string): Record<string, unknown> {
   }
 }
 
-function toCommaString(value: unknown): string {
-  if (Array.isArray(value)) return value.map(String).join(", ");
-  if (typeof value === "string") return value;
-  return "";
-}
-
-function mapAiOutputToDocData(profile: ResumeData, ai: Record<string, unknown>): ResumeDocData {
-  const contact = [profile.email, profile.phone, profile.location, profile.linkedin]
-    .filter(Boolean)
-    .join("  •  ");
-
-  const aiExperience = Array.isArray(ai.experience)
-    ? (ai.experience as unknown[][]).map((bullets) =>
-        Array.isArray(bullets) ? bullets.map(String) : []
-      )
-    : [];
-
-  return {
-    name: profile.name,
-    title: String(ai.profile_title ?? ""),
-    contact,
-    // prompt uses "professional_summary"; fall back to "profile_summary" for custom prompts
-    summary: String(ai.professional_summary ?? ai.profile_summary ?? ""),
-    skills: [
-      {
-        category: "Core Expertise",
-        items: toCommaString(ai.technical_skills ?? ai.technology_skills),
-      },
-      {
-        category: "Tools & Technologies",
-        items: toCommaString(ai.tools_and_technologies),
-      },
-      {
-        category: "Remote Collaboration & Delivery",
-        items: REMOTE_COLLAB_SKILLS,
-      },
-    ],
-    experience: profile.experience.map((job, i) => ({
-      company: job.company,
-      location: job.location,
-      startDate: job.startDate,
-      endDate: job.endDate,
-      title: job.title,
-      bullets: aiExperience[i]?.length
-        ? aiExperience[i]
-        : job.bullets.filter((b) => b.text.trim()).map((b) => b.text),
-    })),
-    education: profile.education,
-  };
-}
-
-// ─── Public API ────────────────────────────────────────────────────────────────
-
 export interface GenerateOptions {
   promptContent?: string;
   contextContent?: string;
@@ -443,12 +328,11 @@ export interface GenerateOptions {
 export interface GenerateResult {
   buffer: Buffer;
   filename: string;
-  safeName: string;
-  tailoredData: ResumeDocData;
 }
 
-export async function generateTailoredResume(
-  resumeData: ResumeData,
+export async function generateFromTemplate(
+  templateId: string,
+  backgroundInfo: string,
   jobDescription: string,
   options: GenerateOptions = {}
 ): Promise<GenerateResult> {
@@ -457,21 +341,46 @@ export async function generateTailoredResume(
     throw new Error("OPENAI_API_KEY is not configured");
   }
 
+  // Fetch template metadata + file from Supabase
+  const { data: tpl, error: tplError } = await supabase
+    .from("docx_templates")
+    .select("name, storage_path, variables")
+    .eq("id", templateId)
+    .single();
+
+  if (tplError || !tpl) throw new Error(`Template not found: ${templateId}`);
+
+  const { data: fileBlob, error: dlError } = await supabase.storage
+    .from("docx-templates")
+    .download(tpl.storage_path);
+
+  if (dlError || !fileBlob) throw new Error("Failed to download DOCX template from storage");
+
+  const templateBuffer = Buffer.from(await fileBlob.arrayBuffer());
+
+  // Use stored variables, or re-extract if column is empty
+  const variables: string[] =
+    Array.isArray(tpl.variables) && tpl.variables.length > 0
+      ? tpl.variables
+      : extractTemplateVariables(templateBuffer);
+
+  if (variables.length === 0) throw new Error("No <<variable>> placeholders found in template");
+
   const { promptContent, contextContent, modelId } = options;
-
   const systemPrompt = promptContent?.trim() || DEFAULT_SYSTEM_PROMPT;
+  const baseUserPrompt = buildUserPrompt(variables, backgroundInfo, jobDescription);
   const userPrompt = contextContent?.trim()
-    ? `Additional context about the target role:\n${contextContent.trim()}\n\n${buildUserPrompt(resumeData, jobDescription)}`
-    : buildUserPrompt(resumeData, jobDescription);
+    ? `Additional context:\n${contextContent.trim()}\n\n${baseUserPrompt}`
+    : baseUserPrompt;
 
-  const openai = new OpenAI({ apiKey });
   const model =
     (modelId && isValidModel(modelId) ? modelId : null) ??
     process.env.OPENAI_MODEL ??
     DEFAULT_MODEL;
-  const reasoningEffort = process.env.REASONING_EFFORT || "medium";
   const isReasoningModel = /^o\d|thinking/i.test(model);
+  const reasoningEffort = process.env.REASONING_EFFORT || "medium";
 
+  const openai = new OpenAI({ apiKey });
   const messages: Parameters<typeof openai.chat.completions.create>[0]["messages"] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: userPrompt },
@@ -492,16 +401,13 @@ export async function generateTailoredResume(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawText = (response as any).choices?.[0]?.message?.content ?? "";
-  const aiOutput = extractJson(rawText);
-  const tailoredData = mapAiOutputToDocData(resumeData, aiOutput);
+  const aiValues = extractJson(rawText);
 
-  const buffer = await buildResumeBuffer(tailoredData);
-
-  const safeName = tailoredData.name
+  const buffer = renderDocxTemplate(templateBuffer, aiValues);
+  const safeName = (aiValues["name"] ?? tpl.name)
     .replace(/[^a-zA-Z0-9_\- ]/g, "")
     .replace(/\s+/g, "_")
     .slice(0, 60);
-  const filename = `${safeName}_resume.docx`;
 
-  return { buffer, filename, safeName, tailoredData };
+  return { buffer, filename: `${safeName}_resume.docx` };
 }

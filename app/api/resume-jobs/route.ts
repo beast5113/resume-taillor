@@ -1,25 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { inngest } from "@/inngest/client";
-import type { ResumeData } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
-  let resumeData: ResumeData;
+  let templateId: string;
+  let backgroundInfo: string;
   let jobDescription: string;
-  let profileId: string | undefined;
   let promptContent: string | undefined;
   let contextContent: string | undefined;
   let modelId: string | undefined;
 
   try {
-    ({ resumeData, jobDescription, profileId, promptContent, contextContent, modelId } =
-      await request.json());
+    ({
+      templateId,
+      backgroundInfo,
+      jobDescription,
+      promptContent,
+      contextContent,
+      modelId,
+    } = await request.json());
   } catch {
     return NextResponse.json({ message: "Invalid request body" }, { status: 400 });
   }
 
-  if (!resumeData?.name?.trim()) {
-    return NextResponse.json({ message: "Name is required in resume data" }, { status: 400 });
+  if (!templateId?.trim()) {
+    return NextResponse.json({ message: "A template must be selected" }, { status: 400 });
+  }
+  if (!backgroundInfo?.trim()) {
+    return NextResponse.json({ message: "Background info is required" }, { status: 400 });
   }
   if (!jobDescription?.trim()) {
     return NextResponse.json({ message: "Job description is required" }, { status: 400 });
@@ -30,11 +38,9 @@ export async function POST(request: NextRequest) {
     .insert({
       status: "queued",
       job_description: jobDescription.trim(),
-      resume_data: resumeData,
       prompt_content: promptContent ?? null,
       context_content: contextContent ?? null,
       model_id: modelId ?? null,
-      profile_id: profileId ?? null,
     })
     .select("id")
     .single();
@@ -51,7 +57,8 @@ export async function POST(request: NextRequest) {
       name: "resume/generate",
       data: {
         jobId: job.id,
-        resumeData,
+        templateId: templateId.trim(),
+        backgroundInfo: backgroundInfo.trim(),
         jobDescription: jobDescription.trim(),
         promptContent,
         contextContent,
@@ -59,7 +66,6 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (err) {
-    // Roll back the queued record so the user can retry
     await supabase.from("resume_jobs").delete().eq("id", job.id);
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json(

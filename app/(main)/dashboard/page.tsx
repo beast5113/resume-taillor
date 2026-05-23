@@ -19,7 +19,6 @@ interface DashboardData {
   total: number;
   inProgress: number;
   offers: number;
-  byAccount: { name: string; count: number }[];
   byStatus: { status: string; count: number }[];
   dailyCounts: { date: string; count: number }[];
   heatmapCounts: { date: string; count: number }[];
@@ -144,36 +143,18 @@ export default function DashboardPage() {
           <StatCard label="Offers" value={data.offers} sub="All time" color="bg-yellow-500" />
         </div>
 
-        {/* By Account + By Status */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="section-card space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">By Account</h2>
-            {data.byAccount.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No applications yet</p>
-            ) : (
-              <div className="space-y-2">
-                {data.byAccount.map((a) => (
-                  <div key={a.name} className="flex items-center justify-between text-sm">
-                    <span className="text-foreground">{a.name}</span>
-                    <span className="text-muted-foreground font-mono">{a.count}</span>
-                  </div>
-                ))}
+        {/* By Status */}
+        <div className="section-card space-y-3">
+          <h2 className="text-sm font-semibold text-foreground">By Status</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-2">
+            {data.byStatus.map((s) => (
+              <div key={s.status} className="flex items-center justify-between text-sm pr-6">
+                <span className="text-foreground">{STATUS_LABELS[s.status] ?? s.status}</span>
+                <span className={`font-mono ${s.count > 0 ? "text-primary" : "text-muted-foreground"}`}>
+                  {s.count}
+                </span>
               </div>
-            )}
-          </div>
-
-          <div className="section-card space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">By Status</h2>
-            <div className="space-y-2">
-              {data.byStatus.map((s) => (
-                <div key={s.status} className="flex items-center justify-between text-sm">
-                  <span className="text-foreground">{STATUS_LABELS[s.status] ?? s.status}</span>
-                  <span className={`font-mono ${s.count > 0 ? "text-primary" : "text-muted-foreground"}`}>
-                    {s.count}
-                  </span>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
         </div>
 
