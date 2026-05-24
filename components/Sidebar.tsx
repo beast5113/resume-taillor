@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Kanban,
   LayoutTemplate,
+  User,
 } from "lucide-react";
 import { logout } from "@/app/actions/logout";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ const NAV = [
   { href: "/contexts",     label: "Contexts",     icon: Layers },
   { href: "/templates",    label: "Templates",    icon: LayoutTemplate },
   { href: "/generate",     label: "Generate",     icon: Zap },
+  { href: "/profile",      label: "Profile",      icon: User },
 ];
 
 export default function Sidebar() {

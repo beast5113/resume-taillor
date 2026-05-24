@@ -28,9 +28,10 @@ export async function POST(request: NextRequest) {
   let company_name: string;
   let job_description: string;
   let template_id: string | undefined;
+  let profile_id: string | undefined;
 
   try {
-    ({ job_url, role, company_name, job_description, template_id } = await request.json());
+    ({ job_url, role, company_name, job_description, template_id, profile_id } = await request.json());
   } catch {
     return NextResponse.json({ message: "Invalid request body" }, { status: 400, headers: CORS_HEADERS });
   }
@@ -43,7 +44,21 @@ export async function POST(request: NextRequest) {
   }
 
   const templateId = template_id?.trim() || process.env.DEFAULT_TEMPLATE_ID;
-  
+
+  let profileName = "";
+  let resolvedProfileId: string | null = null;
+
+  if (profile_id?.trim()) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, name")
+      .eq("id", profile_id.trim())
+      .maybeSingle();
+    if (profile) {
+      resolvedProfileId = profile.id;
+      profileName = profile.name ?? "";
+    }
+  }
 
   const { data: application, error: insertError } = await supabase
     .from("applications")
@@ -52,6 +67,7 @@ export async function POST(request: NextRequest) {
       role: role.trim(),
       company_name: company_name.trim(),
       job_description: job_description.trim(),
+      profile_id: resolvedProfileId,
       status: templateId ? "generating" : "pending",
     })
     .select()
@@ -64,14 +80,17 @@ export async function POST(request: NextRequest) {
   if (templateId) {
     after(async () => {
       try {
+        const backgroundInfo = profileName ? `Name: ${profileName}` : "";
         const { buffer, filename } = await generateFromTemplate(
           templateId,
-          "",
+          backgroundInfo,
           job_description.trim()
         );
 
-        const driveFilename = `${application.seq ? `${filename.replace(".docx", "")}_${application.seq}` : filename}.docx`
-          .replace(".docx.docx", ".docx");
+        const baseName = profileName
+          ? profileName.replace(/[^a-zA-Z0-9]/g, "") + "Resume"
+          : filename.replace(/\.docx$/i, "");
+        const driveFilename = application.seq ? `${baseName}_${application.seq}.docx` : `${baseName}.docx`;
         const { fileId, driveLink } = await uploadResumeToDrive(buffer, driveFilename);
 
         await supabase

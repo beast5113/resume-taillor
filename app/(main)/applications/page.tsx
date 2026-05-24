@@ -19,6 +19,7 @@ interface Application {
   job_url: string | null;
   role: string;
   company_name: string;
+  profile_name: string | null;
   status: "generating" | "completed" | "failed" | "pending";
   pipeline_status: string;
   google_drive_link: string | null;
@@ -160,6 +161,7 @@ export default function ApplicationsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [profileFilter, setProfileFilter] = useState("");
   const [page, setPage] = useState(1);
   const [jdModal, setJdModal] = useState<{
     open: boolean;
@@ -226,19 +228,30 @@ export default function ApplicationsPage() {
     setUpdatingId(null);
   };
 
+  const profileOptions = useMemo(() => {
+    const names = [...new Set(applications.map((a) => a.profile_name).filter((n): n is string => !!n))];
+    return names.sort();
+  }, [applications]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return applications;
-    return applications.filter(
-      (a) => a.company_name.toLowerCase().includes(q) || a.role.toLowerCase().includes(q)
-    );
-  }, [applications, search]);
+    return applications.filter((a) => {
+      if (profileFilter && a.profile_name !== profileFilter) return false;
+      if (!q) return true;
+      return (
+        a.company_name.toLowerCase().includes(q) ||
+        a.role.toLowerCase().includes(q) ||
+        (a.profile_name?.toLowerCase().includes(q) ?? false)
+      );
+    });
+  }, [applications, search, profileFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const handleSearch = (value: string) => { setSearch(value); setPage(1); };
+  const handleProfileFilter = (value: string) => { setProfileFilter(value); setPage(1); };
 
   return (
     <div className="h-full flex flex-col">
@@ -264,16 +277,31 @@ export default function ApplicationsPage() {
       <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-4 sm:py-6">
         <div className="space-y-4">
 
-          {/* Search bar */}
+          {/* Search + profile filter */}
           {!loading && applications.length > 0 && (
-            <div className="relative w-full sm:max-w-72">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-              <Input
-                placeholder="Search company or role…"
-                value={search}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="pl-8 h-8 text-sm"
-              />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-full sm:max-w-72">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Search company or role…"
+                  value={search}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-8 h-8 text-sm"
+                />
+              </div>
+              {profileOptions.length > 0 && (
+                <Select value={profileFilter || "_all"} onValueChange={(v) => handleProfileFilter(v === "_all" ? "" : (v ?? ""))}>
+                  <SelectTrigger className="h-8 text-sm w-auto min-w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all" className="text-xs">All profiles</SelectItem>
+                    {profileOptions.map((name) => (
+                      <SelectItem key={name} value={name} className="text-xs">{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           )}
 
@@ -305,6 +333,7 @@ export default function ApplicationsPage() {
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-10">#</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Company</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Profile</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Gen Status</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Stage</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Submitted</th>
@@ -333,6 +362,9 @@ export default function ApplicationsPage() {
                         </td>
                         <td className="px-4 py-3.5 text-muted-foreground max-w-0 w-full">
                           <div className="truncate" title={app.role}>{app.role}</div>
+                        </td>
+                        <td className="px-4 py-3.5 text-muted-foreground text-xs whitespace-nowrap">
+                          {app.profile_name ?? <span className="text-muted-foreground/30">—</span>}
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2">
@@ -412,6 +444,9 @@ export default function ApplicationsPage() {
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">{app.role}</p>
+                        {app.profile_name && (
+                          <p className="text-[11px] text-muted-foreground/60 truncate">{app.profile_name}</p>
+                        )}
                       </div>
                       <Badge variant={STATUS_VARIANT[app.status]} className="capitalize gap-1 shrink-0">
                         {(app.status === "generating" || app.status === "pending") && (
