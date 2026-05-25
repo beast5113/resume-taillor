@@ -25,7 +25,7 @@ export const generateResumeJob = inngest.createFunction(
   {
     id: "generate-resume",
     triggers: [{ event: "resume/generate" }],
-    concurrency: { limit: 10 },
+    concurrency: { limit: 5 },
     retries: 2,
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
