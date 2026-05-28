@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   RefreshCw, Download, ExternalLink, Trash2, Inbox,
-  Search, ChevronLeft, ChevronRight, Copy, Check, AlertTriangle, FileText, X,
+  Search, ChevronLeft, ChevronRight, Copy, Check, AlertTriangle, FileText, X, Pencil,
 } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Button } from "@/components/ui/button";
@@ -160,6 +160,8 @@ export default function ApplicationsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFields, setEditFields] = useState<{ company_name: string; role: string }>({ company_name: "", role: "" });
   const [search, setSearch] = useState("");
   const [profileFilter, setProfileFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -225,6 +227,29 @@ export default function ApplicationsPage() {
       const updated: Application = await res.json();
       setApplications((prev) => prev.map((a) => (a.id === id ? updated : a)));
     }
+    setUpdatingId(null);
+  };
+
+  const startEdit = (app: Application) => {
+    setEditingId(app.id);
+    setEditFields({ company_name: app.company_name, role: app.role });
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const saveEdit = async (id: string) => {
+    if (!editFields.company_name.trim() || !editFields.role.trim()) return;
+    setUpdatingId(id);
+    const res = await fetch(`/api/applications/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company_name: editFields.company_name.trim(), role: editFields.role.trim() }),
+    });
+    if (res.ok) {
+      const updated: Application = await res.json();
+      setApplications((prev) => prev.map((a) => (a.id === id ? { ...updated, profile_name: a.profile_name } : a)));
+    }
+    setEditingId(null);
     setUpdatingId(null);
   };
 
@@ -345,23 +370,42 @@ export default function ApplicationsPage() {
                       <tr key={app.id} className="hover:bg-accent/30 transition-colors">
                         <td className="px-4 py-3.5 text-muted-foreground text-xs tabular-nums">{app.seq}</td>
                         <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-medium text-foreground whitespace-nowrap">{app.company_name}</span>
-                            {app.job_url && (
-                              <a
-                                href={app.job_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-muted-foreground hover:text-primary transition-colors shrink-0"
-                                title={app.job_url}
-                              >
-                                <ExternalLink size={11} />
-                              </a>
-                            )}
-                          </div>
+                          {editingId === app.id ? (
+                            <input
+                              className="field-input text-sm h-7 px-2 w-36"
+                              value={editFields.company_name}
+                              onChange={(e) => setEditFields((f) => ({ ...f, company_name: e.target.value }))}
+                              onKeyDown={(e) => { if (e.key === "Enter") saveEdit(app.id); if (e.key === "Escape") cancelEdit(); }}
+                              autoFocus
+                            />
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium text-foreground whitespace-nowrap">{app.company_name}</span>
+                              {app.job_url && (
+                                <a
+                                  href={app.job_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-muted-foreground hover:text-primary transition-colors shrink-0"
+                                  title={app.job_url}
+                                >
+                                  <ExternalLink size={11} />
+                                </a>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3.5 text-muted-foreground max-w-0 w-full">
-                          <div className="truncate" title={app.role}>{app.role}</div>
+                          {editingId === app.id ? (
+                            <input
+                              className="field-input text-sm h-7 px-2 w-full"
+                              value={editFields.role}
+                              onChange={(e) => setEditFields((f) => ({ ...f, role: e.target.value }))}
+                              onKeyDown={(e) => { if (e.key === "Enter") saveEdit(app.id); if (e.key === "Escape") cancelEdit(); }}
+                            />
+                          ) : (
+                            <div className="truncate" title={app.role}>{app.role}</div>
+                          )}
                         </td>
                         <td className="px-4 py-3.5 text-muted-foreground text-xs whitespace-nowrap">
                           {app.profile_name ?? <span className="text-muted-foreground/30">—</span>}
@@ -405,12 +449,41 @@ export default function ApplicationsPage() {
                         <td className="px-4 py-3.5 text-muted-foreground text-xs whitespace-nowrap">{formatDate(app.created_at)}</td>
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
-                            <ActionButtons
-                              app={app}
-                              deletingId={deletingId}
-                              onOpenJd={openJd}
-                              onDelete={(id) => setConfirmDeleteId(id)}
-                            />
+                            {editingId === app.id ? (
+                              <>
+                                <button
+                                  onClick={() => saveEdit(app.id)}
+                                  disabled={updatingId === app.id}
+                                  className="inline-flex items-center justify-center size-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 transition-all"
+                                  title="Save"
+                                >
+                                  <Check size={12} />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
+                                  title="Cancel"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => startEdit(app)}
+                                  title="Edit"
+                                  className="inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <ActionButtons
+                                  app={app}
+                                  deletingId={deletingId}
+                                  onOpenJd={openJd}
+                                  onDelete={(id) => setConfirmDeleteId(id)}
+                                />
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -548,13 +621,16 @@ export default function ApplicationsPage() {
                 <Dialog.Title className="text-sm font-semibold text-foreground">Job Description</Dialog.Title>
                 <Dialog.Description className="text-xs text-muted-foreground mt-0.5 truncate">{jdModal.title}</Dialog.Description>
               </div>
-              <Dialog.Close
-                render={
-                  <button className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0 ml-2">
-                    <X size={14} />
-                  </button>
-                }
-              />
+              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                {jdModal.content && <CopyButton url={jdModal.content} />}
+                <Dialog.Close
+                  render={
+                    <button className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                      <X size={14} />
+                    </button>
+                  }
+                />
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4">
               {jdModal.loading ? (
