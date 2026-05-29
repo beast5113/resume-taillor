@@ -26,24 +26,34 @@ export async function POST(request: NextRequest) {
   let job_url: string | undefined;
   let role: string;
   let company_name: string;
-  let job_description: string;
+  let job_description: string | undefined;
   let template_id: string | undefined;
   let profile_id: string | undefined;
+  let tailor_flag: boolean;
 
   try {
-    ({ job_url, role, company_name, job_description, template_id, profile_id } = await request.json());
+    ({ job_url, role, company_name, job_description, template_id, profile_id, tailor_flag } = await request.json());
   } catch {
     return NextResponse.json({ message: "Invalid request body" }, { status: 400, headers: CORS_HEADERS });
   }
 
-  if (!role?.trim() || !company_name?.trim() || !job_description?.trim()) {
+  const shouldTailor = tailor_flag === true;
+
+  if (!role?.trim() || !company_name?.trim()) {
     return NextResponse.json(
-      { message: "role, company_name, and job_description are required" },
+      { message: "role and company_name are required" },
       { status: 400, headers: CORS_HEADERS }
     );
   }
 
-  const templateId = template_id?.trim() || process.env.DEFAULT_TEMPLATE_ID;
+  if (shouldTailor && !job_description?.trim()) {
+    return NextResponse.json(
+      { message: "job_description is required when tailor_flag is true" },
+      { status: 400, headers: CORS_HEADERS }
+    );
+  }
+
+  const templateId = shouldTailor ? (template_id?.trim() || process.env.DEFAULT_TEMPLATE_ID) : undefined;
 
   let profileName = "";
   let resolvedProfileId: string | null = null;
@@ -66,7 +76,7 @@ export async function POST(request: NextRequest) {
       job_url: job_url?.trim() || null,
       role: role.trim(),
       company_name: company_name.trim(),
-      job_description: job_description.trim(),
+      job_description: job_description?.trim() || null,
       profile_id: resolvedProfileId,
       status: templateId ? "generating" : "pending",
     })
@@ -77,14 +87,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: insertError?.message ?? "Insert failed" }, { status: 500, headers: CORS_HEADERS });
   }
 
-  if (templateId) {
+  if (shouldTailor && templateId) {
     after(async () => {
       try {
         const backgroundInfo = profileName ? `Name: ${profileName}` : "";
         const { buffer, filename } = await generateFromTemplate(
           templateId,
           backgroundInfo,
-          job_description.trim()
+          job_description!.trim()
         );
 
         const baseName = profileName
