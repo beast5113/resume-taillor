@@ -402,15 +402,29 @@ export default function ApplicationsPage() {
                                 <span className="font-medium text-foreground whitespace-nowrap">{app.company_name}</span>
                               )}
                               {app.job_url && (
-                                <a
-                                  href={app.job_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-muted-foreground hover:text-primary transition-colors shrink-0"
-                                  title={app.job_url}
-                                >
-                                  <ExternalLink size={11} />
-                                </a>
+                                <Tooltip.Provider>
+                                  <Tooltip.Root>
+                                    <Tooltip.Trigger
+                                      render={
+                                        <a
+                                          href={app.job_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-muted-foreground hover:text-primary transition-colors shrink-0"
+                                        />
+                                      }
+                                    >
+                                      <ExternalLink size={11} />
+                                    </Tooltip.Trigger>
+                                    <Tooltip.Portal>
+                                      <Tooltip.Positioner sideOffset={6}>
+                                        <Tooltip.Popup className="z-50 rounded-md bg-popover px-2.5 py-1 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10">
+                                          {app.job_board ?? app.job_url}
+                                        </Tooltip.Popup>
+                                      </Tooltip.Positioner>
+                                    </Tooltip.Portal>
+                                  </Tooltip.Root>
+                                </Tooltip.Provider>
                               )}
                             </div>
                           )}
@@ -543,14 +557,29 @@ export default function ApplicationsPage() {
                             <span className="font-semibold text-foreground text-sm truncate">{app.company_name}</span>
                           )}
                           {app.job_url && (
-                            <a
-                              href={app.job_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-muted-foreground hover:text-primary transition-colors shrink-0"
-                            >
-                              <ExternalLink size={11} />
-                            </a>
+                            <Tooltip.Provider>
+                              <Tooltip.Root>
+                                <Tooltip.Trigger
+                                  render={
+                                    <a
+                                      href={app.job_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-muted-foreground hover:text-primary transition-colors shrink-0"
+                                    />
+                                  }
+                                >
+                                  <ExternalLink size={11} />
+                                </Tooltip.Trigger>
+                                <Tooltip.Portal>
+                                  <Tooltip.Positioner sideOffset={6}>
+                                    <Tooltip.Popup className="z-50 rounded-md bg-popover px-2.5 py-1 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10">
+                                      {app.job_board ?? app.job_url}
+                                    </Tooltip.Popup>
+                                  </Tooltip.Positioner>
+                                </Tooltip.Portal>
+                              </Tooltip.Root>
+                            </Tooltip.Provider>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">{app.role}</p>
