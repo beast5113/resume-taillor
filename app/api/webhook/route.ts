@@ -30,9 +30,10 @@ export async function POST(request: NextRequest) {
   let template_id: string | undefined;
   let profile_id: string | undefined;
   let tailor_flag: boolean;
+  let job_board: string | undefined;
 
   try {
-    ({ job_url, role, company_name, job_description, template_id, profile_id, tailor_flag } = await request.json());
+    ({ job_url, role, company_name, job_description, template_id, profile_id, tailor_flag, job_board } = await request.json());
   } catch {
     return NextResponse.json({ message: "Invalid request body" }, { status: 400, headers: CORS_HEADERS });
   }
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest) {
       job_description: job_description?.trim() || null,
       profile_id: resolvedProfileId,
       status: shouldTailor ? (templateId ? "generating" : "pending") : "saved",
+      job_board: job_board?.trim() || null,
     })
     .select()
     .single();

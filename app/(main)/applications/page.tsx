@@ -6,6 +6,7 @@ import {
   Search, ChevronLeft, ChevronRight, Copy, Check, AlertTriangle, FileText, X, Pencil,
 } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
+import { Tooltip } from "@base-ui/react/tooltip";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ interface Application {
   job_url: string | null;
   role: string;
   company_name: string;
+  job_board: string | null;
   profile_name: string | null;
   status: "generating" | "completed" | "failed" | "pending";
   pipeline_status: string;
@@ -266,7 +268,8 @@ export default function ApplicationsPage() {
       return (
         a.company_name.toLowerCase().includes(q) ||
         a.role.toLowerCase().includes(q) ||
-        (a.profile_name?.toLowerCase().includes(q) ?? false)
+        (a.profile_name?.toLowerCase().includes(q) ?? false) ||
+        (a.job_board?.toLowerCase().includes(q) ?? false)
       );
     });
   }, [applications, search, profileFilter]);
@@ -380,7 +383,24 @@ export default function ApplicationsPage() {
                             />
                           ) : (
                             <div className="flex items-center gap-1.5">
-                              <span className="font-medium text-foreground whitespace-nowrap">{app.company_name}</span>
+                              {app.job_board ? (
+                                <Tooltip.Provider>
+                                  <Tooltip.Root>
+                                    <Tooltip.Trigger className="font-medium text-foreground whitespace-nowrap cursor-default">
+                                      {app.company_name}
+                                    </Tooltip.Trigger>
+                                    <Tooltip.Portal>
+                                      <Tooltip.Positioner sideOffset={6}>
+                                        <Tooltip.Popup className="z-50 rounded-md bg-popover px-2.5 py-1 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10">
+                                          {app.job_board}
+                                        </Tooltip.Popup>
+                                      </Tooltip.Positioner>
+                                    </Tooltip.Portal>
+                                  </Tooltip.Root>
+                                </Tooltip.Provider>
+                              ) : (
+                                <span className="font-medium text-foreground whitespace-nowrap">{app.company_name}</span>
+                              )}
                               {app.job_url && (
                                 <a
                                   href={app.job_url}
@@ -504,7 +524,24 @@ export default function ApplicationsPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs text-muted-foreground tabular-nums">#{app.seq}</span>
-                          <span className="font-semibold text-foreground text-sm truncate">{app.company_name}</span>
+                          {app.job_board ? (
+                            <Tooltip.Provider>
+                              <Tooltip.Root>
+                                <Tooltip.Trigger className="font-semibold text-foreground text-sm truncate cursor-default">
+                                  {app.company_name}
+                                </Tooltip.Trigger>
+                                <Tooltip.Portal>
+                                  <Tooltip.Positioner sideOffset={6}>
+                                    <Tooltip.Popup className="z-50 rounded-md bg-popover px-2.5 py-1 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10">
+                                      {app.job_board}
+                                    </Tooltip.Popup>
+                                  </Tooltip.Positioner>
+                                </Tooltip.Portal>
+                              </Tooltip.Root>
+                            </Tooltip.Provider>
+                          ) : (
+                            <span className="font-semibold text-foreground text-sm truncate">{app.company_name}</span>
+                          )}
                           {app.job_url && (
                             <a
                               href={app.job_url}
