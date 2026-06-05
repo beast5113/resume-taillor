@@ -32,9 +32,9 @@ export default function KanbanPage() {
   const draggingId = useRef<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/applications?include_profiles=true")
+    fetch("/api/applications?pageSize=500")
       .then((r) => r.json())
-      .then((data) => setApps(Array.isArray(data) ? data : []))
+      .then((result) => setApps(Array.isArray(result.data) ? result.data : []))
       .finally(() => setLoading(false));
   }, []);
 

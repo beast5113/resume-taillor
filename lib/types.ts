@@ -18,7 +18,16 @@ export interface DocxTemplate {
   id: string;
   name: string;
   storage_path: string;
-  variables: string[];   // extracted <<variable>> names
+  variables: string[];
+  template_type: "resume" | "cover_letter";
+  profile_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProfileAssignment {
+  id: string;
+  profile_id: string;
+  user_id: string;
+  created_at: string;
 }

@@ -1,17 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
 
 export async function GET() {
-  const { data, error } = await supabase
+  const session = await requireSession();
+
+  let query = supabase
     .from("profiles")
     .select("id, name, created_at")
     .order("created_at", { ascending: true });
 
+  if (session?.role === "assistant") {
+    const { data: assignments } = await supabase
+      .from("profile_assignments")
+      .select("profile_id")
+      .eq("user_id", session.userId);
+
+    const ids = (assignments ?? []).map((a) => a.profile_id);
+    if (ids.length === 0) return NextResponse.json([]);
+    query = query.in("id", ids);
+  }
+
+  const { data, error } = await query;
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
 
 export async function POST(request: NextRequest) {
+  const session = await requireSession();
+  if (!session || session.role !== "admin")
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+
   let name: string;
   try {
     ({ name } = await request.json());
@@ -19,9 +38,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Invalid request body" }, { status: 400 });
   }
 
-  if (!name?.trim()) {
+  if (!name?.trim())
     return NextResponse.json({ message: "name is required" }, { status: 400 });
-  }
 
   const { data, error } = await supabase
     .from("profiles")

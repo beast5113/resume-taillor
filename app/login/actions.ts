@@ -2,25 +2,29 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE, computeToken, readEnv } from "@/lib/auth";
+import { SESSION_COOKIE, createSession, readEnv } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import bcrypt from "bcryptjs";
 
 export async function login(formData: FormData): Promise<{ error: string } | void> {
-  const email = String(formData.get("email") ?? "");
+  const email = String(formData.get("email") ?? "").toLowerCase().trim();
   const password = String(formData.get("password") ?? "");
-
-  const validEmail = readEnv(process.env.APP_EMAIL);
-  const validPassword = readEnv(process.env.APP_PASSWORD);
   const secret = readEnv(process.env.SESSION_SECRET);
 
-  if (!validEmail || !validPassword || !secret) {
-    return { error: "Server credentials not configured." };
-  }
+  if (!secret) return { error: "Server credentials not configured." };
 
-  if (email !== validEmail || password !== validPassword) {
-    return { error: "Invalid email or password." };
-  }
+  const { data: user } = await supabase
+    .from("team_users")
+    .select("id, role, password_hash")
+    .eq("email", email)
+    .maybeSingle();
 
-  const token = await computeToken(validEmail, validPassword, secret);
+  if (!user) return { error: "Invalid email or password." };
+
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) return { error: "Invalid email or password." };
+
+  const token = await createSession(user.id, user.role, secret);
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -30,5 +34,5 @@ export async function login(formData: FormData): Promise<{ error: string } | voi
     path: "/",
   });
 
-  redirect("/");
+  redirect(user.role === "admin" ? "/" : "/applications");
 }

@@ -12,23 +12,33 @@ import {
   Kanban,
   LayoutTemplate,
   User,
+  Users,
+  Hammer,
 } from "lucide-react";
 import { logout } from "@/app/actions/logout";
 import { Button } from "@/components/ui/button";
 
-const NAV = [
-  { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/kanban",       label: "Kanban",       icon: Kanban },
-  { href: "/applications", label: "Applications", icon: Briefcase },
-  { href: "/prompts",      label: "Prompts",      icon: MessageSquare },
-  { href: "/contexts",     label: "Contexts",     icon: Layers },
-  { href: "/templates",    label: "Templates",    icon: LayoutTemplate },
-  { href: "/generate",     label: "Generate",     icon: Zap },
-  { href: "/profile",      label: "Profile",      icon: User },
+const ALL_NAV = [
+  { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard, roles: ["admin"] },
+  { href: "/kanban",       label: "Kanban",       icon: Kanban,          roles: ["admin"]},
+  { href: "/applications", label: "Applications", icon: Briefcase,       roles: ["admin", "assistant"] },
+  { href: "/prompts",      label: "Prompts",      icon: MessageSquare,   roles: ["admin"] },
+  { href: "/contexts",     label: "Contexts",     icon: Layers,          roles: ["admin"] },
+  { href: "/templates",    label: "Templates",    icon: LayoutTemplate,  roles: ["admin"] },
+  { href: "/generate",     label: "Generate",     icon: Zap,             roles: ["admin"] },
+  { href: "/builder",      label: "Builder",      icon: Hammer,          roles: ["admin", "assistant"] },
+  { href: "/profile",      label: "Profile",      icon: User,            roles: ["admin"] },
+  { href: "/team",         label: "Team",         icon: Users,           roles: ["admin"] },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  role: "admin" | "assistant";
+  userName: string;
+}
+
+export default function Sidebar({ role, userName }: SidebarProps) {
   const pathname = usePathname();
+  const nav = ALL_NAV.filter((item) => item.roles.includes(role));
 
   return (
     <aside className="w-44 shrink-0 bg-sidebar flex flex-col border-r border-sidebar-border">
@@ -44,7 +54,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {nav.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
           return (
             <Link
@@ -64,7 +74,10 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-4 border-t border-sidebar-border">
+      <div className="px-3 py-4 border-t border-sidebar-border space-y-1">
+        {userName && (
+          <p className="px-3 py-1 text-xs text-sidebar-foreground/40 truncate">{userName}</p>
+        )}
         <form action={logout}>
           <Button
             type="submit"

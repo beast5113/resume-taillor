@@ -1,20 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
+
+const PAGE_SIZE = 20;
 
 export async function GET(request: NextRequest) {
-  void request; // unused but kept for Next.js route signature
+  const session = await requireSession();
+  const sp = request.nextUrl.searchParams;
 
-  const { data, error } = await supabase
+  const page      = Math.max(1, parseInt(sp.get("page") ?? "1", 10));
+  const pageSize  = Math.min(500, Math.max(1, parseInt(sp.get("pageSize") ?? String(PAGE_SIZE), 10)));
+  const search    = sp.get("search")?.trim() ?? "";
+  const profileId = sp.get("profileId") ?? "";
+  const bidderId  = sp.get("bidderId") ?? "";
+  const status    = sp.get("status") ?? "";
+  const stage     = sp.get("stage") ?? "";
+  const dateFrom  = sp.get("dateFrom") ?? "";
+  const dateTo    = sp.get("dateTo") ?? "";
+
+  const from = (page - 1) * pageSize;
+  const to   = from + pageSize - 1;
+
+  let query = supabase
     .from("applications")
-    .select("id, seq, job_url, role, company_name, job_board, status, pipeline_status, google_drive_link, google_drive_file_id, error_message, created_at, updated_at, profiles(name)")
-    .order("created_at", { ascending: false });
+    .select(
+      "id, seq, job_url, role, company_name, job_board, status, pipeline_status, google_drive_link, google_drive_file_id, error_message, notes, created_at, updated_at, created_by, profile_id, profiles(name), creator:team_users!created_by(name)",
+      { count: "exact" }
+    )
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
+  if (session?.role === "assistant") {
+    query = query.eq("created_by", session.userId);
+  } else if (bidderId) {
+    query = query.eq("created_by", bidderId);
+  }
+
+  if (search) {
+    const escaped = search.replace(/[%_]/g, "\\$&");
+    query = query.or(`company_name.ilike.%${escaped}%,role.ilike.%${escaped}%`);
+  }
+  if (profileId) query = query.eq("profile_id", profileId);
+  if (status)    query = query.eq("status", status);
+  if (stage)     query = query.eq("pipeline_status", stage);
+  if (dateFrom)  query = query.gte("created_at", `${dateFrom}T00:00:00.000Z`);
+  if (dateTo)    query = query.lte("created_at", `${dateTo}T23:59:59.999Z`);
+
+  const { data, error, count } = await query;
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
 
-  const flattened = (data ?? []).map(({ profiles, ...rest }) => ({
+  const flattened = (data ?? []).map(({ profiles, creator, ...rest }) => ({
     ...rest,
     profile_name: (profiles as unknown as { name: string } | null)?.name ?? null,
+    bidder_name:  (creator  as unknown as { name: string } | null)?.name ?? null,
   }));
 
-  return NextResponse.json(flattened);
+  return NextResponse.json({ data: flattened, total: count ?? 0 });
 }

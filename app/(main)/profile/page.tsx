@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Users } from "lucide-react";
 
-interface Profile {
-  id: string;
-  name: string;
-  created_at: string;
-}
+interface Profile { id: string; name: string; created_at: string; }
+interface TeamUser { id: string; name: string; email: string; }
+interface Assignment { id: string; profile_id: string; user_id: string; }
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -36,42 +35,61 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Assigned assistants for the selected profile
+  const [allUsers, setAllUsers] = useState<TeamUser[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/profiles");
-    if (res.ok) setProfiles(await res.json());
+    const [profileRes, userRes] = await Promise.all([
+      fetch("/api/profiles"),
+      fetch("/api/team"),
+    ]);
+    if (profileRes.ok) setProfiles(await profileRes.json());
+    if (userRes.ok) {
+      const users: (TeamUser & { role: string })[] = await userRes.json();
+      setAllUsers(users.filter((u) => u.role === "assistant"));
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
+  const loadAssignments = useCallback(async (profileId: string) => {
+    setLoadingAssignments(true);
+    const res = await fetch(`/api/profile-assignments?profile_id=${profileId}`).catch(() => null);
+    if (res?.ok) setAssignments(await res.json());
+    else setAssignments([]);
+    setLoadingAssignments(false);
+  }, []);
+
   const select = (p: Profile) => {
     setSelectedId(p.id);
     setEditName(p.name);
     setError("");
+    loadAssignments(p.id);
   };
 
   const newProfile = () => {
     setSelectedId("new");
     setEditName("");
     setError("");
+    setAssignments([]);
   };
 
   const save = async () => {
     if (!editName.trim()) { setError("Name is required"); return; }
     setSaving(true);
     setError("");
-
     const isNew = selectedId === "new";
     const url = isNew ? "/api/profiles" : `/api/profiles/${selectedId}`;
     const method = isNew ? "POST" : "PATCH";
-
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: editName }),
     });
-
     if (!res.ok) {
       const { message } = await res.json().catch(() => ({ message: "Save failed" }));
       setError(message);
@@ -79,6 +97,7 @@ export default function ProfilePage() {
       const saved: Profile = await res.json();
       await load();
       setSelectedId(saved.id);
+      if (isNew) loadAssignments(saved.id);
     }
     setSaving(false);
   };
@@ -91,6 +110,8 @@ export default function ProfilePage() {
   };
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
+  const assignedUserIds = new Set(assignments.map((a) => a.user_id));
+  const assignedUsers = allUsers.filter((u) => assignedUserIds.has(u.id));
 
   return (
     <div className="flex h-full">
@@ -146,7 +167,7 @@ export default function ProfilePage() {
             <div>
               <p className="text-sm text-zinc-300 font-medium mb-1">Profiles</p>
               <p className="text-xs text-zinc-500 max-w-xs">
-                Each profile represents a candidate. The profile name is used when generating and naming resumes from the extension.
+                Each profile represents a candidate. The profile name is used when generating and naming resumes.
               </p>
             </div>
             <button onClick={newProfile} className="btn-secondary">
@@ -167,10 +188,7 @@ export default function ProfilePage() {
                 {saving ? "Saving…" : selectedId === "new" ? "Create" : "Save"}
               </button>
               {selectedId !== "new" && (
-                <button
-                  onClick={() => deleteProfile(selectedId)}
-                  className="btn-ghost text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-2"
-                >
+                <button onClick={() => deleteProfile(selectedId)} className="btn-ghost text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-2">
                   <TrashIcon />
                 </button>
               )}
@@ -182,7 +200,7 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {selectedId !== "new" && selectedProfile && (
                 <div className="space-y-3">
                   <div>
@@ -194,6 +212,32 @@ export default function ProfilePage() {
                   <p className="text-xs text-zinc-600">
                     Use this ID in your browser extension to associate submissions with this profile.
                   </p>
+                </div>
+              )}
+
+              {selectedId !== "new" && (
+                <div>
+                  <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Users size={11} /> Assigned Assistants
+                  </p>
+                  {loadingAssignments ? (
+                    <p className="text-xs text-zinc-500">Loading…</p>
+                  ) : assignedUsers.length === 0 ? (
+                    <p className="text-xs text-zinc-600 italic">
+                      No assistants assigned. Manage assignments from the{" "}
+                      <a href="/team" className="text-zinc-400 underline hover:text-zinc-200">Team page</a>.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {assignedUsers.map((u) => (
+                        <div key={u.id} className="flex items-center gap-1.5 bg-zinc-800/60 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300">
+                          <Users size={11} className="text-zinc-500" />
+                          <span>{u.name}</span>
+                          <span className="text-zinc-600">{u.email}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
