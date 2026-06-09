@@ -1,4 +1,17 @@
 import { cookies } from "next/headers";
+import { NextRequest } from "next/server";
+import { supabase } from "@/lib/supabase";
+
+/** Returns live role from DB, or null if the user doesn't exist or is disabled. */
+async function getLiveUser(userId: string): Promise<{ role: string } | null> {
+  const { data } = await supabase
+    .from("team_users")
+    .select("role, is_active")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!data || !data.is_active) return null;
+  return { role: data.role };
+}
 
 export const SESSION_COOKIE = "rt_session";
 
@@ -47,9 +60,42 @@ export async function verifySession(token: string, secret: string): Promise<Sess
   return { userId, role };
 }
 
-/** Read and verify the session cookie from the current request. Returns null if missing or invalid. */
+/** Read and verify the session cookie. Role is always read live from DB, not from the token. */
 export async function requireSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value ?? "";
-  return verifySession(token, readEnv(process.env.SESSION_SECRET));
+  const payload = await verifySession(token, readEnv(process.env.SESSION_SECRET));
+  if (!payload) return null;
+  const user = await getLiveUser(payload.userId);
+  if (!user) return null;
+  return { userId: payload.userId, role: user.role };
+}
+
+/** Verify Authorization: Bearer <token>. Role is always read live from DB, not from the token. */
+export async function requireBearerAuth(request: NextRequest): Promise<SessionPayload | null> {
+  const authHeader = request.headers.get("authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return null;
+  const token = authHeader.slice(7).trim();
+  if (!token) return null;
+
+  const payload = await verifySession(token, readEnv(process.env.SESSION_SECRET));
+  if (!payload) return null;
+
+  const { data: sessionRow } = await supabase
+    .from("sessions")
+    .select("user_id")
+    .eq("token", token)
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle();
+
+  if (!sessionRow) return null;
+
+  const user = await getLiveUser(payload.userId);
+  if (!user) return null;
+  return { userId: payload.userId, role: user.role };
+}
+
+/** Try Bearer token first, fall back to session cookie. Returns null if neither is valid. */
+export async function requireAnyAuth(request: NextRequest): Promise<SessionPayload | null> {
+  return (await requireBearerAuth(request)) ?? (await requireSession());
 }

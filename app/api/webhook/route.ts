@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireBearerAuth } from "@/lib/auth";
 import { generateFromTemplate } from "@/lib/generateResume";
 import { uploadResumeToDrive } from "@/lib/googleDrive";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Webhook-Secret",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 export function OPTIONS() {
@@ -15,12 +16,9 @@ export function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
-  const webhookSecret = process.env.WEBHOOK_SECRET;
-  if (webhookSecret) {
-    const provided = request.headers.get("x-webhook-secret");
-    if (!provided || provided !== webhookSecret) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
-    }
+  const session = await requireBearerAuth(request);
+  if (!session) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
   }
 
   let job_url: string | undefined;

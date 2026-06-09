@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { requireSession } from "@/lib/auth";
+import { requireAnyAuth } from "@/lib/auth";
 
-export async function GET() {
-  const session = await requireSession();
+export async function GET(request: NextRequest) {
+  const session = await requireAnyAuth(request);
+  if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   let query = supabase
     .from("profiles")
-    .select("id, name, created_at")
-    .order("created_at", { ascending: true });
+    .select("id, name")
+    .order("name", { ascending: true });
 
-  if (session?.role === "assistant") {
+  if (session.role === "assistant") {
     const { data: assignments } = await supabase
       .from("profile_assignments")
       .select("profile_id")
@@ -23,11 +24,11 @@ export async function GET() {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  return NextResponse.json(data ?? []);
 }
 
 export async function POST(request: NextRequest) {
-  const session = await requireSession();
+  const session = await requireAnyAuth(request);
   if (!session || session.role !== "admin")
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 

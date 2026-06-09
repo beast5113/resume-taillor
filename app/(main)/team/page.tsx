@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import React from "react";
 import {
   Users, Trash2, Pencil, X, Check, Plus, AlertTriangle, RefreshCw,
-  Eye, EyeOff, ChevronDown, ChevronUp,
+  Eye, EyeOff, ChevronDown, ChevronUp, Power,
 } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ interface TeamUser {
   name: string;
   email: string;
   role: "admin" | "assistant";
+  is_active: boolean;
   created_at: string;
 }
 
@@ -143,6 +144,7 @@ export default function TeamPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -213,6 +215,24 @@ export default function TeamPage() {
     setConfirmDeleteId(null);
   };
 
+  const handleToggle = async (m: TeamUser) => {
+    setTogglingId(m.id);
+    setApiError("");
+    const res = await fetch(`/api/team/${m.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: !m.is_active }),
+    });
+    if (res.ok) {
+      const updated: TeamUser = await res.json();
+      setMembers((prev) => prev.map((u) => (u.id === m.id ? updated : u)));
+    } else {
+      const data = await res.json();
+      setApiError(data.message ?? "Failed to update status.");
+    }
+    setTogglingId(null);
+  };
+
   const handleCreate = async () => {
     if (!createForm.name.trim() || !createForm.email.trim() || !createForm.password.trim()) {
       setCreateError("All fields are required.");
@@ -277,14 +297,15 @@ export default function TeamPage() {
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Email</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Joined</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Joined</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {members.map((m) => (
                   <React.Fragment key={m.id}>
-                    <tr className="hover:bg-accent/30 transition-colors">
+                    <tr className={`hover:bg-accent/30 transition-colors${!m.is_active ? " opacity-60" : ""}`}>
                       <td className="px-4 py-3.5">
                         {editingId === m.id ? (
                           <Input value={editFields.name} onChange={(e) => setEditFields((f) => ({ ...f, name: e.target.value }))}
@@ -316,7 +337,18 @@ export default function TeamPage() {
                           </Badge>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 text-muted-foreground text-xs hidden sm:table-cell">{formatDate(m.created_at)}</td>
+                      <td className="px-4 py-3.5 hidden sm:table-cell">
+                        {m.is_active ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground ring-1 ring-foreground/10">
+                            Inactive
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-muted-foreground text-xs hidden lg:table-cell">{formatDate(m.created_at)}</td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-end gap-1.5">
                           {editingId === m.id ? (
@@ -349,6 +381,18 @@ export default function TeamPage() {
                                 className="inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-all" title="Edit">
                                 <Pencil size={12} />
                               </button>
+                              <button
+                                onClick={() => handleToggle(m)}
+                                disabled={togglingId === m.id}
+                                className={`inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent transition-all disabled:opacity-50 ${
+                                  m.is_active
+                                    ? "text-muted-foreground hover:text-destructive hover:border-destructive/30 hover:bg-destructive/5"
+                                    : "text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/30 hover:bg-emerald-500/5"
+                                }`}
+                                title={m.is_active ? "Disable member" : "Enable member"}
+                              >
+                                <Power size={12} />
+                              </button>
                               <Button size="icon-sm" variant="ghost" onClick={() => setConfirmDeleteId(m.id)} disabled={deletingId === m.id}
                                 className="text-muted-foreground hover:text-destructive">
                                 <Trash2 size={13} />
@@ -360,7 +404,7 @@ export default function TeamPage() {
                     </tr>
                     {expandedId === m.id && (
                       <tr key={`${m.id}-assignments`}>
-                        <td colSpan={5} className="p-0">
+                        <td colSpan={6} className="p-0">
                           <AssignmentPanel member={m} profiles={profiles} />
                         </td>
                       </tr>

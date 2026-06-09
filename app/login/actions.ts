@@ -15,7 +15,7 @@ export async function login(formData: FormData): Promise<{ error: string } | voi
 
   const { data: user } = await supabase
     .from("team_users")
-    .select("id, role, password_hash")
+    .select("id, role, password_hash, is_active")
     .eq("email", email)
     .maybeSingle();
 
@@ -23,6 +23,8 @@ export async function login(formData: FormData): Promise<{ error: string } | voi
 
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return { error: "Invalid email or password." };
+
+  if (!user.is_active) return { error: "Your account has been disabled. Contact an administrator." };
 
   const token = await createSession(user.id, user.role, secret);
   const cookieStore = await cookies();

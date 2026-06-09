@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { supabase } from "@/lib/supabase";
-import { verifySession, SESSION_COOKIE, readEnv } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 
 async function requireAdmin() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value ?? "";
-  const session = await verifySession(token, readEnv(process.env.SESSION_SECRET));
+  const session = await requireSession();
   if (!session || session.role !== "admin") return null;
   return session;
 }
@@ -19,7 +16,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("team_users")
-    .select("id, name, email, role, created_at")
+    .select("id, name, email, role, is_active, created_at")
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
@@ -45,7 +42,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from("team_users")
     .insert({ name: name.trim(), email: email.toLowerCase().trim(), password_hash, role })
-    .select("id, name, email, role, created_at")
+    .select("id, name, email, role, is_active, created_at")
     .single();
 
   if (error) {
