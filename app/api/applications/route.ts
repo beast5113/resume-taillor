@@ -6,6 +6,7 @@ const PAGE_SIZE = 20;
 
 export async function GET(request: NextRequest) {
   const session = await requireSession();
+  if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   const sp = request.nextUrl.searchParams;
 
   const page      = Math.max(1, parseInt(sp.get("page") ?? "1", 10));

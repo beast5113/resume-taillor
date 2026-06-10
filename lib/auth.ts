@@ -38,9 +38,10 @@ async function hmacHex(payload: string, secret: string): Promise<string> {
 
 export type SessionPayload = { userId: string; role: string };
 
-/** Token format: `userId:role:<hmac(userId:role)>` */
+/** Token format: `userId:role:nonce:<hmac(userId:role:nonce)>` */
 export async function createSession(userId: string, role: string, secret: string): Promise<string> {
-  const payload = `${userId}:${role}`;
+  const nonce = crypto.randomUUID().replace(/-/g, "");
+  const payload = `${userId}:${role}:${nonce}`;
   const sig = await hmacHex(payload, secret);
   return `${payload}:${sig}`;
 }
@@ -52,10 +53,9 @@ export async function verifySession(token: string, secret: string): Promise<Sess
   const sig = token.slice(last + 1);
   const expected = await hmacHex(payload, secret);
   if (!timingSafeEqual(sig, expected)) return null;
-  const colonIdx = payload.indexOf(":");
-  if (colonIdx === -1) return null;
-  const userId = payload.slice(0, colonIdx);
-  const role = payload.slice(colonIdx + 1);
+  const parts = payload.split(":");
+  const userId = parts[0];
+  const role = parts[1];
   if (!userId || !role) return null;
   return { userId, role };
 }
