@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
       job_description: job_description?.trim() || null,
       profile_id: resolvedProfileId,
       status: shouldTailor ? (templateId ? "generating" : "pending") : "saved",
+      pipeline_status: "saved",
       job_board: job_board?.trim() || null,
     })
     .select()

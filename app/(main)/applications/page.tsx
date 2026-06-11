@@ -50,7 +50,9 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 };
 
 const PIPELINE_OPTIONS = [
+  { value: "saved",        label: "Saved" },
   { value: "applied",      label: "Applied" },
+  { value: "external",     label: "External" },
   { value: "hr_interview", label: "HR Interview" },
   { value: "tech_1",       label: "Tech 1" },
   { value: "tech_2",       label: "Tech 2" },
@@ -59,7 +61,9 @@ const PIPELINE_OPTIONS = [
 ];
 
 const PIPELINE_COLORS: Record<string, string> = {
+  saved:        "text-muted-foreground",
   applied:      "text-blue-500",
+  external:     "text-cyan-500",
   hr_interview: "text-yellow-500",
   tech_1:       "text-purple-500",
   tech_2:       "text-orange-500",
@@ -159,6 +163,7 @@ export default function ApplicationsPage() {
   const [profileId, setProfileId]             = useState("");
   const [bidderId, setBidderId]               = useState("");
   const [statusFilter, setStatusFilter]       = useState("");
+  const [stageFilter, setStageFilter]         = useState("");
   const [dateFrom, setDateFrom]               = useState("");
   const [dateTo, setDateTo]                   = useState("");
   const [page, setPage]                       = useState(1);
@@ -222,6 +227,7 @@ export default function ApplicationsPage() {
     if (profileId)       p.set("profileId", profileId);
     if (bidderId)        p.set("bidderId", bidderId);
     if (statusFilter)    p.set("status", statusFilter);
+    if (stageFilter)     p.set("stage", stageFilter);
     if (dateFrom)        p.set("dateFrom", dateFrom);
     if (dateTo)          p.set("dateTo", dateTo);
 
@@ -236,7 +242,7 @@ export default function ApplicationsPage() {
       .catch(() => { if (active) setLoading(false); });
 
     return () => { active = false; };
-  }, [refreshKey, page, debouncedSearch, profileId, bidderId, statusFilter, dateFrom, dateTo]);
+  }, [refreshKey, page, debouncedSearch, profileId, bidderId, statusFilter, stageFilter, dateFrom, dateTo]);
 
   // Background poll while any app is in-progress (no loading spinner)
   useEffect(() => {
@@ -247,10 +253,10 @@ export default function ApplicationsPage() {
 
   const resetFilters = () => {
     setSearch(""); setDebouncedSearch(""); setProfileId(""); setBidderId("");
-    setStatusFilter(""); setDateFrom(""); setDateTo(""); setPage(1);
+    setStatusFilter(""); setStageFilter(""); setDateFrom(""); setDateTo(""); setPage(1);
   };
 
-  const hasActiveFilters = !!(search || profileId || bidderId || statusFilter || dateFrom || dateTo);
+  const hasActiveFilters = !!(search || profileId || bidderId || statusFilter || stageFilter || dateFrom || dateTo);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Handlers
@@ -425,6 +431,17 @@ export default function ApplicationsPage() {
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground/60 pl-1">Status</p>
+            </div>
+
+            <div className="flex flex-col gap-0.5">
+              <Select value={stageFilter || "_all"} onValueChange={v => { setStageFilter(v === "_all" ? "" : (v ?? "")); setPage(1); }}>
+                <SelectTrigger className="h-8 text-sm w-auto min-w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all" className="text-xs">All stages</SelectItem>
+                  {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground/60 pl-1">Stage</p>
             </div>
 
             <div className="flex flex-col gap-0.5">

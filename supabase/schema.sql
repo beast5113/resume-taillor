@@ -60,7 +60,7 @@ create table if not exists applications (
   job_description      text        not null,
   profile_id           uuid        references profiles(id) on delete set null,
   status               text        not null default 'pending',
-  pipeline_status      text        not null default 'applied',
+  pipeline_status      text        not null default 'saved',
   google_drive_link    text,
   google_drive_file_id text,
   error_message        text,
