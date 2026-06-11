@@ -491,7 +491,7 @@ export default function ApplicationsPage() {
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Profile</th>
                       {isAdmin && <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Bidder</th>}
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                      {isAdmin && <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Stage</th>}
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Stage</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</th>
                       <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
@@ -579,19 +579,17 @@ export default function ApplicationsPage() {
                           </div>
                         </td>
 
-                        {/* Stage — admin only */}
-                        {isAdmin && (
-                          <td className="px-4 py-3.5">
-                            <Select value={app.pipeline_status} onValueChange={val => val && handlePipelineChange(app.id, val)} disabled={updatingId === app.id}>
-                              <SelectTrigger size="sm" className={`border-0 bg-transparent px-1.5 shadow-none focus-visible:ring-0 focus-visible:border-input h-8 text-sm font-medium ${PIPELINE_COLORS[app.pipeline_status] ?? "text-foreground"}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent align="start">
-                                {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </td>
-                        )}
+                        {/* Stage */}
+                        <td className="px-4 py-3.5">
+                          <Select value={app.pipeline_status} onValueChange={val => val && handlePipelineChange(app.id, val)} disabled={updatingId === app.id}>
+                            <SelectTrigger size="sm" className={`border-0 bg-transparent px-1.5 shadow-none focus-visible:ring-0 focus-visible:border-input h-8 text-sm font-medium ${PIPELINE_COLORS[app.pipeline_status] ?? "text-foreground"}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent align="start">
+                              {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </td>
 
                         <td className="px-4 py-3.5 text-muted-foreground text-xs whitespace-nowrap">{formatDate(app.created_at)}</td>
 
@@ -660,16 +658,14 @@ export default function ApplicationsPage() {
                     </div>
                     {app.status === "failed" && app.error_message && <p className="text-xs text-destructive truncate">{app.error_message}</p>}
                     <div className="flex items-center justify-between gap-2">
-                      {isAdmin ? (
-                        <Select value={app.pipeline_status} onValueChange={val => val && handlePipelineChange(app.id, val)} disabled={updatingId === app.id}>
-                          <SelectTrigger size="sm" className={`border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 h-8 text-sm font-medium w-auto ${PIPELINE_COLORS[app.pipeline_status] ?? "text-foreground"}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent align="start">
-                            {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      ) : <span />}
+                      <Select value={app.pipeline_status} onValueChange={val => val && handlePipelineChange(app.id, val)} disabled={updatingId === app.id}>
+                        <SelectTrigger size="sm" className={`border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 h-8 text-sm font-medium w-auto ${PIPELINE_COLORS[app.pipeline_status] ?? "text-foreground"}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent align="start">
+                          {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                       <span className="text-xs text-muted-foreground shrink-0">{formatDate(app.created_at)}</span>
                     </div>
                     <div className="pt-1 border-t border-border flex items-center justify-between gap-2">
