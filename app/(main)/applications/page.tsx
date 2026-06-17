@@ -511,6 +511,17 @@ export default function ApplicationsPage() {
                     {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <button
+                  onClick={() => {
+                    applications
+                      .filter(a => selectedIds.has(a.id) && a.job_url)
+                      .forEach(a => window.open(a.job_url!, "_blank", "noopener,noreferrer"));
+                  }}
+                  disabled={!applications.some(a => selectedIds.has(a.id) && a.job_url)}
+                  className="size-7 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  title="Open selected job URLs in new tabs">
+                  <ExternalLink size={13} />
+                </button>
                 <button onClick={() => setSelectedIds(new Set())}
                   className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Clear selection">
                   <X size={13} />
