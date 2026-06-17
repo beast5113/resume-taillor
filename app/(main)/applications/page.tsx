@@ -175,6 +175,8 @@ export default function ApplicationsPage() {
   const [updatingId, setUpdatingId]           = useState<string | null>(null);
   const [editingId, setEditingId]             = useState<string | null>(null);
   const [editFields, setEditFields]           = useState({ company_name: "", role: "" });
+  const [selectedIds, setSelectedIds]         = useState<Set<string>>(new Set());
+  const [bulkUpdating, setBulkUpdating]       = useState(false);
   const [jdModal, setJdModal] = useState<{ open: boolean; loading: boolean; content: string | null; title: string }>({
     open: false, loading: false, content: null, title: "",
   });
@@ -196,6 +198,9 @@ export default function ApplicationsPage() {
     const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 400);
     return () => clearTimeout(t);
   }, [search]);
+
+  // Clear selection when page or data changes
+  useEffect(() => { setSelectedIds(new Set()); }, [page, refreshKey]);
 
   // Load current user + filter option lists once on mount
   useEffect(() => {
@@ -292,6 +297,39 @@ export default function ApplicationsPage() {
       setApplications(prev => prev.map(a => a.id === id ? { ...a, pipeline_status: updated.pipeline_status } : a));
     }
     setUpdatingId(null);
+  };
+
+  const toggleSelect = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const allOnPageSelected = applications.length > 0 && applications.every(a => selectedIds.has(a.id));
+  const someOnPageSelected = applications.some(a => selectedIds.has(a.id));
+
+  const toggleSelectAll = () => {
+    if (allOnPageSelected) {
+      setSelectedIds(prev => { const next = new Set(prev); applications.forEach(a => next.delete(a.id)); return next; });
+    } else {
+      setSelectedIds(prev => { const next = new Set(prev); applications.forEach(a => next.add(a.id)); return next; });
+    }
+  };
+
+  const handleBulkPipelineChange = async (pipeline_status: string) => {
+    if (selectedIds.size === 0 || !pipeline_status) return;
+    setBulkUpdating(true);
+    const ids = Array.from(selectedIds);
+    const res = await fetch("/api/applications/batch", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, pipeline_status }),
+    });
+    if (res.ok) {
+      setApplications(prev => prev.map(a => selectedIds.has(a.id) ? { ...a, pipeline_status } : a));
+      setSelectedIds(new Set());
+    }
+    setBulkUpdating(false);
   };
 
   const startEdit = (app: Application) => {
@@ -461,6 +499,24 @@ export default function ApplicationsPage() {
                 <X size={11} /> Clear
               </button>
             )}
+
+            {selectedIds.size > 0 && (
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground whitespace-nowrap">{selectedIds.size} selected</span>
+                <Select onValueChange={(val: string | null) => { if (val) void handleBulkPipelineChange(val); }} disabled={bulkUpdating}>
+                  <SelectTrigger size="sm" className="h-8 text-sm w-auto min-w-36">
+                    <SelectValue placeholder={bulkUpdating ? "Updating…" : "Set stage…"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <button onClick={() => setSelectedIds(new Set())}
+                  className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Clear selection">
+                  <X size={13} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ── Content ── */}
@@ -485,6 +541,10 @@ export default function ApplicationsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
+                      <th className="px-4 py-3 w-8">
+                        <input type="checkbox" checked={allOnPageSelected} ref={el => { if (el) el.indeterminate = someOnPageSelected && !allOnPageSelected; }} onChange={toggleSelectAll}
+                          className="rounded border-input cursor-pointer accent-primary" />
+                      </th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-10">#</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Company</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
@@ -499,7 +559,11 @@ export default function ApplicationsPage() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {applications.map(app => (
-                      <tr key={app.id} className="hover:bg-accent/30 transition-colors">
+                      <tr key={app.id} className={`hover:bg-accent/30 transition-colors ${selectedIds.has(app.id) ? "bg-accent/20" : ""}`}>
+                        <td className="px-4 py-3.5">
+                          <input type="checkbox" checked={selectedIds.has(app.id)} onChange={() => toggleSelect(app.id)}
+                            className="rounded border-input cursor-pointer accent-primary" />
+                        </td>
                         <td className="px-4 py-3.5 text-muted-foreground text-xs tabular-nums">{app.seq}</td>
 
                         {/* Company */}
@@ -635,9 +699,11 @@ export default function ApplicationsPage() {
               {/* ── Mobile cards ── */}
               <div className="md:hidden space-y-3">
                 {applications.map(app => (
-                  <div key={app.id} className="bg-card rounded-xl ring-1 ring-foreground/10 p-4 space-y-3">
+                  <div key={app.id} className={`bg-card rounded-xl ring-1 ring-foreground/10 p-4 space-y-3 ${selectedIds.has(app.id) ? "ring-primary/40 bg-accent/10" : ""}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
+                      <input type="checkbox" checked={selectedIds.has(app.id)} onChange={() => toggleSelect(app.id)}
+                        className="mt-0.5 rounded border-input cursor-pointer accent-primary shrink-0" />
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs text-muted-foreground tabular-nums">#{app.seq}</span>
                           <span className="font-semibold text-foreground text-sm truncate">{app.company_name}</span>
