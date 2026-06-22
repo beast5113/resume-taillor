@@ -554,7 +554,7 @@ export default function ApplicationsPage() {
                     <tr className="border-b border-border">
                       <th className="px-4 py-3 w-8">
                         <input type="checkbox" checked={allOnPageSelected} ref={el => { if (el) el.indeterminate = someOnPageSelected && !allOnPageSelected; }} onChange={toggleSelectAll}
-                          className="rounded border-input cursor-pointer accent-primary" />
+                          className="size-4 rounded border-input cursor-pointer accent-primary" />
                       </th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider w-10">#</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Company</th>
@@ -573,7 +573,7 @@ export default function ApplicationsPage() {
                       <tr key={app.id} className={`hover:bg-accent/30 transition-colors ${selectedIds.has(app.id) ? "bg-accent/20" : ""}`}>
                         <td className="px-4 py-3.5">
                           <input type="checkbox" checked={selectedIds.has(app.id)} onChange={() => toggleSelect(app.id)}
-                            className="rounded border-input cursor-pointer accent-primary" />
+                            className="size-4 rounded border-input cursor-pointer accent-primary" />
                         </td>
                         <td className="px-4 py-3.5 text-muted-foreground text-xs tabular-nums">{app.seq}</td>
 
@@ -713,7 +713,7 @@ export default function ApplicationsPage() {
                   <div key={app.id} className={`bg-card rounded-xl ring-1 ring-foreground/10 p-4 space-y-3 ${selectedIds.has(app.id) ? "ring-primary/40 bg-accent/10" : ""}`}>
                     <div className="flex items-start justify-between gap-2">
                       <input type="checkbox" checked={selectedIds.has(app.id)} onChange={() => toggleSelect(app.id)}
-                        className="mt-0.5 rounded border-input cursor-pointer accent-primary shrink-0" />
+                        className="mt-0.5 size-4 rounded border-input cursor-pointer accent-primary shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs text-muted-foreground tabular-nums">#{app.seq}</span>
