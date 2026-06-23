@@ -230,12 +230,12 @@ Length: 1 line, 7–9 words
 Include:
 
 * Job title
-* 3~4 core skills
+* 3~4 core skills by seperated • symbol
 * Industry if useful
 * Job Title Level 
 
 Example:
-Backend Software Engineer | Cloud Microservices, Go, Azure
+Backend Software Engineer | Cloud Microservices • Go • Azure
 
 * Level Selection Rules
 
