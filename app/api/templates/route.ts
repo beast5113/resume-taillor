@@ -22,6 +22,11 @@ export async function GET(request: NextRequest) {
     query = query.in("profile_id", profileIds);
   }
 
+  const profileId = request.nextUrl.searchParams.get("profile_id");
+  if (profileId) {
+    query = query.eq("profile_id", profileId);
+  }
+
   const { data, error } = await query;
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
   return NextResponse.json(data ?? []);

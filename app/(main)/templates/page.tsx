@@ -27,6 +27,7 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<DocxTemplate[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterProfileId, setFilterProfileId] = useState<string>("");
 
   const [uploadName, setUploadName] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -61,6 +62,7 @@ export default function TemplatesPage() {
   };
 
   const handleUpload = async () => {
+    if (!uploadProfileId) { setUploadError("Profile is required"); setUploadStatus("error"); return; }
     if (!uploadName.trim()) { setUploadError("Template name is required"); setUploadStatus("error"); return; }
     if (!uploadFile) { setUploadError("Please select a .docx file"); setUploadStatus("error"); return; }
 
@@ -175,13 +177,13 @@ export default function TemplatesPage() {
 
               {/* Profile */}
               <div>
-                <label className="field-label">Profile</label>
+                <label className="field-label">Profile *</label>
                 <select
                   className="field-input"
                   value={uploadProfileId}
-                  onChange={(e) => setUploadProfileId(e.target.value)}
+                  onChange={(e) => { setUploadProfileId(e.target.value); setUploadStatus("idle"); }}
                 >
-                  <option value="">No profile (global)</option>
+                  <option value="" disabled>Select a profile…</option>
                   {profiles.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
@@ -244,21 +246,33 @@ export default function TemplatesPage() {
           {/* ── Right: Saved templates ── */}
           <div className="flex-1 min-w-0 overflow-y-auto px-8 py-8">
             <div className="section-card space-y-3">
-              <h2 className="text-sm font-semibold text-foreground">Saved Templates</h2>
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-sm font-semibold text-foreground">Saved Templates</h2>
+                <select
+                  className="field-input w-44 text-xs"
+                  value={filterProfileId}
+                  onChange={(e) => setFilterProfileId(e.target.value)}
+                >
+                  <option value="">All Profiles</option>
+                  {profiles.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
 
               {loading && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
                   <Loader2 size={14} className="animate-spin" /> Loading templates…
                 </div>
               )}
-              {!loading && templates.length === 0 && (
+              {!loading && templates.filter((t) => !filterProfileId || t.profile_id === filterProfileId).length === 0 && (
                 <p className="text-xs text-muted-foreground py-4 text-center">
-                  No templates yet. Upload your first .docx template above.
+                  {filterProfileId ? "No templates for this profile." : "No templates yet. Upload your first .docx template above."}
                 </p>
               )}
 
               <div className="divide-y divide-border">
-                {templates.map((t) => (
+                {templates.filter((t) => !filterProfileId || t.profile_id === filterProfileId).map((t) => (
                   <div key={t.id} className="py-3 first:pt-0 last:pb-0">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 min-w-0">
