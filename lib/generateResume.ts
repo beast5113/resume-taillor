@@ -223,17 +223,106 @@ Naturally include:
 ## Profile Title Rules
 
 Must match the target job title exactly or as a close ATS variant.
+From job description you must understand who company looking for.
 
 Length: 1 line, 7–9 words
 
 Include:
 
 * Job title
-* 4–6 core skills
+* 3~4 core skills
 * Industry if useful
+* Job Title Level 
 
 Example:
-Backend Software Engineer - Cloud Microservices, Go, Azure
+Backend Software Engineer | Cloud Microservices, Go, Azure
+
+* Level Selection Rules
+
+Infer the correct seniority level from the job description:
+
+- Your profile should be Senior, Staff, or Principal
+- Use Principal only for Software Engineering roles
+- Otherwise choose the closest appropriate level (Senior or Staff)
+Standard Title Mapping Examples
+
+1. Software Engineering
+
+Senior Software Engineer
+Staff Software Engineer
+Principal Software Engineer
+
+2. Backend Engineering
+
+Senior Backend Engineer
+Senior Python Backend Engineer
+Staff Java Backend Engineer
+
+3. Frontend Engineering
+
+Senior Frontend Engineer
+Staff React Frontend Engineer
+
+4. Full Stack Engineering
+
+Senior Full Stack Engineer
+Staff Full Stack Engineer
+
+5. Platform / Infrastructure
+
+Senior Platform Engineer
+Senior Infrastructure Engineer
+
+6. DevOps (engineering-heavy only)
+
+Senior DevOps Engineer
+Staff DevOps Engineer
+
+7. SRE
+
+Site Reliability Engineer
+Staff Site Reliability Engineer
+
+8. ML / AI Engineering
+
+Senior Machine Learning Engineer
+Senior AI Engineer
+
+9. Data Engineering
+
+Senior Data Engineer
+Staff Data Engineer
+
+10. API / Integration
+
+Senior API Engineer
+Senior Integration Engineer
+
+11. Cloud Engineering
+
+Senior Cloud Software Engineer
+Staff Cloud Software Engineer
+
+12. Mobile Engineering
+
+Senior Mobile App Engineer
+
+13. Systems Engineering
+
+Principal Systems Software Engineer
+
+14. Other Roles (use job title directly)
+
+Build & Release Engineer
+Forward Deployed Engineer/Senior Forward Deployed Engineer
+Senior Solutions Architect / Principal Solutions Architect
+Sales Engineer / Solutions Engineer
+Data Analyst / BI Analyst
+Product / Program / Project Manager
+QA Manual Tester
+Security / SOC Analyst
+
+If you cannot find from the above examples, you will get it from job's title.
 
 Avoid:
 ❌ Creative titles  ❌ Tech Ninja  ❌ buzzwords  ❌ soft skills
@@ -255,6 +344,69 @@ Keep it 2–3 concise sentences (25–30 words optimal).
 ---
 
 # ATS Keyword Extraction Rules
+
+From the job title and job description, extract:
+
+1. technical_skills — programming languages, frameworks, architectures aligned with the JD
+2. tools_and_technologies — platforms, cloud services, DevOps tools aligned with the JD
+
+Only extract what appears in or is directly implied by the job description and the candidate's employment history. Do not fabricate.
+
+---
+
+# Employment Role Progression
+
+Standardize and enhance employment history descriptions to reflect advanced career progression, ensuring clarity, consistency, and seniority alignment across roles.
+Role Ordering Rule
+
+Given a sequence of employment titles:
+
+<<role_title_1>>, <<role_title_2>>, <<role_title_3>> ...
+
+Assume the order represents career progression over time
+<<role_title_3>> represents the earliest (junior) role
+<<role_title_1>> represents the most recent (latest) role
+
+The final output should reflect a natural upward career trajectory from junior → senior level
+
+# Career Progression Requirement
+
+Rewrite roles so they clearly reflect an advancing career path, where:
+
+Early roles may be junior or entry-level
+Mid roles reflect intermediate growth
+Latest role should reflect the highest achieved seniority
+
+Ensure the progression is logically consistent and professionally realistic.
+
+# Seniority Standards
+
+For software engineering and related technical roles:
+
+Allowed seniority levels:
+Junior / Entry-level (only for earliest roles)
+Mid-level (Engineer, Developer, etc.)
+Senior
+Staff
+Principal (use only for Software Engineering roles when justified)
+Latest role (<<role_title_1>>) should generally be:
+Senior / Staff / Principal level depending on experience
+
+# Role Interpretation Rules
+Infer progression based on job titles and responsibilities
+Do not downgrade senior roles unless explicitly required
+Ensure each subsequent role shows clear advancement in responsibility, scope, or expertise
+
+Output Requirements
+Maintain professional job titles
+Ensure consistent ATS-friendly formatting
+Avoid exaggeration beyond realistic career growth
+Keep progression logical and industry-standard
+
+
+
+----
+
 
 From the job title and job description, extract:
 
