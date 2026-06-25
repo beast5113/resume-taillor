@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { DocxTemplate } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { getJsonCoveredVars } from "@/lib/docxTemplater";
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
@@ -64,14 +65,14 @@ function initCoverLetter(): CoverLetterState {
 
 // ─── JSON helpers ─────────────────────────────────────────────────────────────
 
-function parseJson(raw: string): { data: Record<string, string> | null; error: string | null } {
+function parseJson(raw: string): { data: Record<string, unknown> | null; error: string | null } {
   const trimmed = raw.trim();
   if (!trimmed) return { data: null, error: null };
   try {
     const parsed = JSON.parse(trimmed);
     if (typeof parsed !== "object" || Array.isArray(parsed) || parsed === null)
       return { data: null, error: "Must be a JSON object { ... }" };
-    return { data: parsed as Record<string, string>, error: null };
+    return { data: parsed as Record<string, unknown>, error: null };
   } catch {
     return { data: null, error: "Invalid JSON" };
   }
@@ -93,7 +94,7 @@ function ResumeSection({ templates, loadingData, state, onChange, onValidate, on
   const selectedTemplate = templates.find((t) => t.id === state.templateId);
   const { data: parsedValues, error: jsonError } = parseJson(state.jsonInput);
   const jsonSyntaxValid = state.jsonInput.trim() === "" || (jsonError === null && parsedValues !== null);
-  const validatedKeys = parsedValues ? new Set(Object.keys(parsedValues)) : null;
+  const validatedKeys = parsedValues ? getJsonCoveredVars(parsedValues) : null;
 
   return (
     <div className="section-card space-y-4 flex flex-col">
@@ -169,7 +170,7 @@ function ResumeSection({ templates, loadingData, state, onChange, onValidate, on
             state.jsonInput.trim() && !jsonSyntaxValid ? "border-destructive/60 focus:border-destructive" : ""
           }`}
           rows={12}
-          placeholder={'{\n  "name": "Jane Doe",\n  "title": "Software Engineer",\n  "summary": "…"\n}'}
+          placeholder={'{\n  "profile_title": "Senior Engineer | Python • AWS",\n  "profile_summary": "…",\n  "skills": [{ "category": "Backend", "items": ["Python", "FastAPI"] }],\n  "experience": [{ "role_title": "Senior Engineer", "bullet_points": ["Built…"], "bold_words": ["Python"] }]\n}'}
           value={state.jsonInput}
           onChange={(e) => onChange({ jsonInput: e.target.value, error: null, downloadUrl: null, validation: null })}
           onPaste={(e) => {
@@ -377,8 +378,8 @@ export default function BuilderPage() {
       }
       const template = resumeTemplates.find((t) => t.id === state.templateId);
       const vars = template?.variables ?? [];
-      const keys = new Set(Object.keys(values));
-      const missingFields = vars.filter((v) => !keys.has(v));
+      const covered = getJsonCoveredVars(values);
+      const missingFields = vars.filter((v) => !covered.has(v));
       setState({ validation: { jsonError: null, missingFields, ok: missingFields.length === 0 } });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -394,7 +395,7 @@ export default function BuilderPage() {
       const res = await fetch("/api/builder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateId: resume.templateId, values }),
+        body: JSON.stringify({ templateId: resume.templateId, values: values }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Build failed");
       const blob = await res.blob();

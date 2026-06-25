@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { renderDocxTemplate } from "@/lib/docxTemplater";
+import {
+  renderDocxTemplate,
+  renderDocxTemplateStructured,
+  isStructuredOutput,
+  mapStructuredToFlat,
+  type StructuredAIOutput,
+} from "@/lib/docxTemplater";
 
 export async function POST(request: NextRequest) {
   let templateId: string;
-  let values: Record<string, string>;
+  let values: Record<string, unknown>;
 
   try {
     ({ templateId, values } = await request.json());
@@ -36,7 +42,12 @@ export async function POST(request: NextRequest) {
   let buffer: Buffer;
   try {
     const templateBuffer = Buffer.from(await fileBlob.arrayBuffer());
-    buffer = renderDocxTemplate(templateBuffer, values);
+    if (isStructuredOutput(values)) {
+      const structured = values as unknown as StructuredAIOutput;
+      buffer = renderDocxTemplateStructured(templateBuffer, structured, mapStructuredToFlat(structured));
+    } else {
+      buffer = renderDocxTemplate(templateBuffer, values as Record<string, string>);
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ message: msg }, { status: 500 });
