@@ -177,6 +177,7 @@ export default function ApplicationsPage() {
   const [editFields, setEditFields]           = useState({ company_name: "", role: "" });
   const [selectedIds, setSelectedIds]         = useState<Set<string>>(new Set());
   const [bulkUpdating, setBulkUpdating]       = useState(false);
+  const [bulkStatusUpdating, setBulkStatusUpdating] = useState(false);
   const [jdModal, setJdModal] = useState<{ open: boolean; loading: boolean; content: string | null; title: string }>({
     open: false, loading: false, content: null, title: "",
   });
@@ -330,6 +331,22 @@ export default function ApplicationsPage() {
       setSelectedIds(new Set());
     }
     setBulkUpdating(false);
+  };
+
+  const handleBulkStatusChange = async (status: string) => {
+    if (selectedIds.size === 0 || !status) return;
+    setBulkStatusUpdating(true);
+    const ids = Array.from(selectedIds);
+    const res = await fetch("/api/applications/batch", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, status }),
+    });
+    if (res.ok) {
+      setApplications(prev => prev.map(a => selectedIds.has(a.id) ? { ...a, status: status as Application["status"] } : a));
+      setSelectedIds(new Set());
+    }
+    setBulkStatusUpdating(false);
   };
 
   const startEdit = (app: Application) => {
@@ -509,6 +526,15 @@ export default function ApplicationsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select onValueChange={(val: string | null) => { if (val) void handleBulkStatusChange(val); }} disabled={bulkStatusUpdating}>
+                  <SelectTrigger size="sm" className="h-8 text-sm w-auto min-w-36">
+                    <SelectValue placeholder={bulkStatusUpdating ? "Updating…" : "Set status…"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending" className="text-sm">Pending (BatchBuilder)</SelectItem>
+                    <SelectItem value="saved" className="text-sm">Saved</SelectItem>
                   </SelectContent>
                 </Select>
                 <button

@@ -28,15 +28,16 @@ export async function POST(request: NextRequest) {
   let template_id: string | undefined;
   let profile_id: string | undefined;
   let tailor_flag: boolean;
+  let batch_mode: boolean | undefined;
   let job_board: string | undefined;
 
   try {
-    ({ job_url, role, company_name, job_description, template_id, profile_id, tailor_flag, job_board } = await request.json());
+    ({ job_url, role, company_name, job_description, template_id, profile_id, tailor_flag, batch_mode, job_board } = await request.json());
   } catch {
     return NextResponse.json({ message: "Invalid request body" }, { status: 400, headers: CORS_HEADERS });
   }
 
-  const shouldTailor = tailor_flag === true;
+  const shouldTailor = tailor_flag === true && batch_mode !== true;
 
   if (!role?.trim() || !company_name?.trim()) {
     return NextResponse.json(
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
       job_description: job_description?.trim() || null,
       profile_id: resolvedProfileId,
       created_by: session.userId,
-      status: shouldTailor ? (templateId ? "generating" : "pending") : "saved",
+      status: batch_mode === true ? "pending" : (shouldTailor ? (templateId ? "generating" : "pending") : "saved"),
       pipeline_status: "saved",
       job_board: job_board?.trim() || null,
     })
