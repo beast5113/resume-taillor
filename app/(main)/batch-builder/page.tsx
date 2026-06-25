@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
-  Loader2, Download, Check, X, Copy, Zap, Code2,
+  Loader2, Download, Check, Copy, Zap, Code2,
   ChevronLeft, ChevronRight, PackageCheck, AlertTriangle,
   RefreshCw, Upload,
 } from "lucide-react";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Dialog } from "@base-ui/react/dialog";
+import { DocxTemplate } from "@/lib/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,7 +28,6 @@ interface Application {
   created_at: string;
 }
 
-interface DocxTemplate { id: string; name: string; }
 interface Profile { id: string; name: string; }
 
 type CardPhase =
@@ -55,94 +54,12 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-// ── JSON Modal ────────────────────────────────────────────────────────────────
-
-function JsonModal({
-  open,
-  onClose,
-  onBuild,
-  building,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onBuild: (json: string) => void;
-  building: boolean;
-}) {
-  const [value, setValue] = useState("");
-  const [jsonError, setJsonError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) { setValue(""); setJsonError(null); }
-  }, [open]);
-
-  const validate = () => {
-    try {
-      JSON.parse(value.trim());
-      setJsonError(null);
-      return true;
-    } catch (e) {
-      setJsonError(e instanceof Error ? e.message : "Invalid JSON");
-      return false;
-    }
-  };
-
-  const handleBuild = () => {
-    if (validate()) onBuild(value.trim());
-  };
-
-  return (
-    <Dialog.Root open={open} onOpenChange={open => { if (!open && !building) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 duration-150" />
-        <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-2xl bg-card rounded-xl ring-1 ring-foreground/10 shadow-xl flex flex-col data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <div>
-              <Dialog.Title className="text-sm font-semibold text-foreground">Manual JSON Input</Dialog.Title>
-              <Dialog.Description className="text-xs text-muted-foreground mt-0.5">
-                Paste your JSON object (from ChatGPT or other sources) to build the resume
-              </Dialog.Description>
-            </div>
-            <Dialog.Close render={
-              <button disabled={building} className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-40">
-                <X size={14} />
-              </button>
-            } />
-          </div>
-          <div className="px-5 py-4 space-y-3">
-            <textarea
-              className="field-input w-full font-mono text-xs px-3 py-2 resize-none rounded-lg min-h-72"
-              placeholder={'{\n  "profile_title": "...",\n  "profile_summary": "...",\n  "skills": [...],\n  "experience": [...]\n}'}
-              value={value}
-              onChange={e => { setValue(e.target.value); setJsonError(null); }}
-              disabled={building}
-              spellCheck={false}
-            />
-            {jsonError && (
-              <p className="text-xs text-destructive flex items-center gap-1.5">
-                <AlertTriangle size={12} />{jsonError}
-              </p>
-            )}
-          </div>
-          <div className="flex justify-end gap-2 px-5 pb-5">
-            <Dialog.Close render={<Button variant="outline" size="sm" disabled={building}>Cancel</Button>} />
-            <Button size="sm" variant="outline" onClick={validate} disabled={building || !value.trim()}>
-              Validate
-            </Button>
-            <Button size="sm" onClick={handleBuild} disabled={building || !value.trim()}>
-              {building ? <><Loader2 size={13} className="animate-spin" />Building…</> : "Build Resume"}
-            </Button>
-          </div>
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
 
 // ── Application Card ──────────────────────────────────────────────────────────
 
 function AppCard({
   app,
-  templateId,
+  templates,
   profiles,
   state,
   onGenerate,
@@ -152,23 +69,28 @@ function AppCard({
   onComplete,
 }: {
   app: Application;
-  templateId: string;
+  templates: DocxTemplate[];
   profiles: Profile[];
   state: CardState;
-  onGenerate: () => void;
-  onBuildJson: (json: string) => void;
-  onCopyPrompt: () => void;
+  onGenerate: (templateId: string) => void;
+  onBuildJson: (json: string, templateId: string) => void;
+  onCopyPrompt: (templateId: string) => void;
   onDownload: () => void;
   onComplete: (profileId: string) => void;
 }) {
-  const [jsonModalOpen, setJsonModalOpen] = useState(false);
+  const [jsonInput, setJsonInput] = useState("");
+  const [jsonInputError, setJsonInputError] = useState<string | null>(null);
+  const [templateId, setTemplateId] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState(app.profile_id ?? "");
   const [copied, setCopied] = useState(false);
 
   const effectiveProfileId = app.profile_id ?? selectedProfileId;
+  const profileTemplates = templates.filter(
+    t => t.template_type === "resume" && t.profile_id === app.profile_id
+  );
 
   const handleCopyPrompt = async () => {
-    await onCopyPrompt();
+    await onCopyPrompt(templateId);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -178,7 +100,7 @@ function AppCard({
 
   if (phase === "done") {
     return (
-      <div className="bg-card rounded-xl ring-1 ring-green-500/30 p-4 flex flex-col items-center justify-center gap-2 min-h-44 text-center">
+      <div className="h-full bg-card rounded-xl ring-1 ring-green-500/30 p-4 flex flex-col items-center justify-center gap-2 text-center">
         <div className="size-10 rounded-full bg-green-500/10 flex items-center justify-center">
           <Check size={20} className="text-green-500" />
         </div>
@@ -189,8 +111,7 @@ function AppCard({
   }
 
   return (
-    <>
-      <div className={`bg-card rounded-xl ring-1 p-4 flex flex-col gap-3 ${error ? "ring-destructive/30" : "ring-foreground/10"}`}>
+    <div className={`h-full bg-card rounded-xl ring-1 p-4 flex flex-col gap-3 ${error ? "ring-destructive/30" : "ring-foreground/10"}`}>
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -212,6 +133,27 @@ function AppCard({
           </div>
         </div>
 
+        {/* Template selector — filtered to this card's profile */}
+        {profileTemplates.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground/60 px-0.5">
+            No templates assigned to this profile
+          </p>
+        ) : (
+          <Select value={templateId || "_none"} onValueChange={v => setTemplateId(v === "_none" ? "" : (v ?? ""))}>
+            <SelectTrigger className="h-7 text-xs w-full">
+              <span className="truncate">
+                {templateId
+                  ? (profileTemplates.find(t => t.id === templateId)?.name ?? "Select template…")
+                  : "Select template…"}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_none" className="text-xs text-muted-foreground">Select template…</SelectItem>
+              {profileTemplates.map(t => <SelectItem key={t.id} value={t.id} className="text-xs">{t.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+
         {/* Profile override (if app has no profile) */}
         {!app.profile_id && profiles.length > 0 && (
           <Select value={selectedProfileId || "_none"} onValueChange={v => setSelectedProfileId(v === "_none" ? "" : (v ?? ""))}>
@@ -225,7 +167,26 @@ function AppCard({
           </Select>
         )}
 
-        {/* Status line */}
+        {/* Always-visible JSON textarea */}
+        {phase !== "ready" && (
+          <div className="flex flex-col gap-1.5 flex-1 min-h-0">
+            <textarea
+              className="w-full flex-1 min-h-0 field-input font-mono text-xs px-2.5 py-2 resize-none rounded-lg"
+              placeholder={'{\n  "profile_title": "...",\n  "profile_summary": "...",\n  "skills": [...],\n  "experience": [...]\n}'}
+              value={jsonInput}
+              onChange={e => { setJsonInput(e.target.value); setJsonInputError(null); }}
+              disabled={busy}
+              spellCheck={false}
+            />
+            {jsonInputError && (
+              <p className="text-[11px] text-destructive flex items-center gap-1 shrink-0">
+                <AlertTriangle size={11} />{jsonInputError}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Status feedback */}
         {phase === "generating" && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 size={12} className="animate-spin" />Generating with AI…
@@ -260,23 +221,32 @@ function AppCard({
 
         {/* Actions */}
         <div className="flex flex-wrap gap-1.5 mt-auto pt-1 border-t border-border">
-          {(phase === "idle" || phase === "error") && (
+          {(phase === "idle" || phase === "error" || phase === "building" || phase === "generating" || phase === "copying") && (
             <>
               <button
-                onClick={onGenerate}
+                onClick={() => onGenerate(templateId)}
                 disabled={!templateId || busy}
-                title={!templateId ? "Select a template first" : "Generate resume with AI"}
+                title={!templateId ? "Select a template first" : "Generate with AI"}
                 className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-all disabled:opacity-40 disabled:pointer-events-none"
               >
                 <Zap size={11} />AI
               </button>
               <button
-                onClick={() => setJsonModalOpen(true)}
-                disabled={!templateId || busy}
-                title={!templateId ? "Select a template first" : "Build from JSON"}
+                onClick={() => {
+                  if (!templateId) return;
+                  try {
+                    JSON.parse(jsonInput.trim());
+                    setJsonInputError(null);
+                    onBuildJson(jsonInput.trim(), templateId);
+                  } catch (e) {
+                    setJsonInputError(e instanceof Error ? e.message : "Invalid JSON");
+                  }
+                }}
+                disabled={!templateId || !jsonInput.trim() || busy}
+                title={!templateId ? "Select a template first" : !jsonInput.trim() ? "Paste JSON above first" : "Build from JSON"}
                 className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent text-xs font-medium transition-all disabled:opacity-40 disabled:pointer-events-none"
               >
-                <Code2 size={11} />JSON
+                <Code2 size={11} />Build
               </button>
               <button
                 onClick={handleCopyPrompt}
@@ -316,7 +286,7 @@ function AppCard({
                 Prompt
               </button>
               <button
-                onClick={onGenerate}
+                onClick={() => onGenerate(templateId)}
                 disabled={!templateId}
                 title="Regenerate with AI"
                 className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent text-xs font-medium transition-all disabled:opacity-40 disabled:pointer-events-none"
@@ -326,15 +296,7 @@ function AppCard({
             </>
           )}
         </div>
-      </div>
-
-      <JsonModal
-        open={jsonModalOpen}
-        onClose={() => setJsonModalOpen(false)}
-        onBuild={json => { setJsonModalOpen(false); onBuildJson(json); }}
-        building={phase === "building"}
-      />
-    </>
+    </div>
   );
 }
 
@@ -347,9 +309,8 @@ export default function BatchBuilderPage() {
   const [page, setPage]                 = useState(1);
   const [refreshKey, setRefreshKey]     = useState(0);
 
-  const [templates, setTemplates]   = useState<DocxTemplate[]>([]);
-  const [profiles, setProfiles]     = useState<Profile[]>([]);
-  const [templateId, setTemplateId] = useState("");
+  const [templates, setTemplates] = useState<DocxTemplate[]>([]);
+  const [profiles, setProfiles]   = useState<Profile[]>([]);
 
   const [cardStates, setCardStates] = useState<Record<string, CardState>>({});
   const fileBuffers = useRef<Record<string, { data: ArrayBuffer; filename: string }>>({});
@@ -388,7 +349,7 @@ export default function BatchBuilderPage() {
   const getCard = (id: string): CardState =>
     cardStates[id] ?? { phase: "idle", file: null, error: null };
 
-  const handleGenerate = async (app: Application) => {
+  const handleGenerate = async (app: Application, templateId: string) => {
     if (!templateId) return;
     setCardPhase(app.id, "generating");
     try {
@@ -411,7 +372,7 @@ export default function BatchBuilderPage() {
     }
   };
 
-  const handleBuildJson = async (app: Application, jsonStr: string) => {
+  const handleBuildJson = async (app: Application, jsonStr: string, templateId: string) => {
     if (!templateId) return;
     setCardPhase(app.id, "building");
     try {
@@ -435,7 +396,7 @@ export default function BatchBuilderPage() {
     }
   };
 
-  const handleCopyPrompt = async (app: Application) => {
+  const handleCopyPrompt = async (app: Application, templateId: string) => {
     if (!templateId) return;
     setCardPhase(app.id, "copying");
     try {
@@ -520,33 +481,12 @@ export default function BatchBuilderPage() {
             Process pending applications — generate resumes and upload to Google Drive
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="flex flex-col gap-0.5">
-            <Select value={templateId || "_none"} onValueChange={v => setTemplateId(v === "_none" ? "" : (v ?? ""))}>
-              <SelectTrigger className="h-8 text-sm w-auto min-w-44">
-                <SelectValue placeholder="Select template…" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none" className="text-xs text-muted-foreground">Select template…</SelectItem>
-                {templates.map(t => <SelectItem key={t.id} value={t.id} className="text-xs">{t.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] text-muted-foreground/60 pl-1">Template (all cards)</p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => setRefreshKey(k => k + 1)}>
-            <RefreshCw size={13} /><span className="hidden sm:inline">Refresh</span>
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={() => setRefreshKey(k => k + 1)}>
+          <RefreshCw size={13} /><span className="hidden sm:inline">Refresh</span>
+        </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-4 sm:py-6">
-        {!templateId && (
-          <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 ring-1 ring-amber-500/20 text-sm text-amber-600 dark:text-amber-400">
-            <AlertTriangle size={14} className="shrink-0" />
-            Select a template above to enable AI generation, JSON build, and Copy Prompt.
-          </div>
-        )}
-
+      <div className="flex-1 overflow-hidden flex flex-col px-4 sm:px-8 py-4 sm:py-6">
         {loading ? (
           <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">
             <Loader2 size={20} className="animate-spin mr-2" />Loading…
@@ -561,19 +501,19 @@ export default function BatchBuilderPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="flex-1 min-h-0 flex flex-col gap-4">
             {/* 4-column grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 auto-rows-fr">
               {applications.map(app => (
                 <AppCard
                   key={app.id}
                   app={app}
-                  templateId={templateId}
+                  templates={templates}
                   profiles={profiles}
                   state={getCard(app.id)}
-                  onGenerate={() => handleGenerate(app)}
-                  onBuildJson={json => handleBuildJson(app, json)}
-                  onCopyPrompt={() => handleCopyPrompt(app)}
+                  onGenerate={templateId => handleGenerate(app, templateId)}
+                  onBuildJson={(json, templateId) => handleBuildJson(app, json, templateId)}
+                  onCopyPrompt={templateId => handleCopyPrompt(app, templateId)}
                   onDownload={() => handleDownload(app)}
                   onComplete={profileId => handleComplete(app, profileId)}
                 />
@@ -581,7 +521,7 @@ export default function BatchBuilderPage() {
             </div>
 
             {/* Pagination */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div className="shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>{total} pending application{total !== 1 ? "s" : ""}</span>
               {totalPages > 1 && (
                 <div className="flex items-center gap-1">
