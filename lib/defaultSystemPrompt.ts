@@ -727,6 +727,7 @@ The summary must:
 
 * Open with the target job title or close variant
 * Include years of experience only if supported by the employment timeline
+* If not given the employment timeline, include 9 years or 10 years
 * Include the most relevant named technologies
 * Include concrete product or workflow context
 * Include production-readiness signals
