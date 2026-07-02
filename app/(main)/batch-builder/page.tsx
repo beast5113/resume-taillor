@@ -477,9 +477,6 @@ export default function BatchBuilderPage() {
             <PackageCheck size={18} className="text-primary shrink-0" />
             <h1 className="text-base sm:text-lg font-semibold text-foreground">Batch Builder</h1>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
-            Process pending applications — generate resumes and upload to Google Drive
-          </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setRefreshKey(k => k + 1)}>
           <RefreshCw size={13} /><span className="hidden sm:inline">Refresh</span>

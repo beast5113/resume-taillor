@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
 const PIPELINE_STATUSES = [
-  "applied", "screening", "hr_interview", "tech_round_1",
-  "tech_round_2", "final", "offer", "failed",
+  "saved", "applied", "external", "screening", "hr_interview",
+  "tech_1", "tech_2", "offer", "failed",
 ] as const;
 
 export async function GET() {

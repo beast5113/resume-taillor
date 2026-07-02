@@ -131,7 +131,6 @@ export default function DashboardPage() {
     <div className="h-full flex flex-col overflow-y-auto">
       <div className="px-8 py-6 border-b border-border">
         <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Job application activity at a glance</p>
       </div>
 
       <div className="flex-1 px-8 py-6 space-y-6 max-w-7xl">

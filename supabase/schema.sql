@@ -64,6 +64,11 @@ create table if not exists applications (
   google_drive_link    text,
   google_drive_file_id text,
   error_message        text,
+  recruiter_name        text,
+  recruiter_email       text,
+  recruiter_phone       text,
+  scheduled_meeting_at  timestamptz,
+  meeting_done          boolean     not null default false,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
 );
@@ -71,6 +76,11 @@ create table if not exists applications (
 -- Run this if the table already exists:
 -- alter table applications add column if not exists pipeline_status text not null default 'applied';
 -- alter table applications add column if not exists seq serial unique;
+-- alter table applications add column if not exists recruiter_name text;
+-- alter table applications add column if not exists recruiter_email text;
+-- alter table applications add column if not exists recruiter_phone text;
+-- alter table applications add column if not exists scheduled_meeting_at timestamptz;
+-- alter table applications add column if not exists meeting_done boolean not null default false;
 
 -- Migrate pipeline_status to unified values (run once on existing data):
 -- update applications set pipeline_status = 'hr_interview' where pipeline_status in ('screening', 'hr_interview');

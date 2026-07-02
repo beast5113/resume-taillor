@@ -449,9 +449,6 @@ export default function BuilderPage() {
     <div className="h-full flex flex-col">
       <div className="px-8 py-6 border-b border-border">
         <h1 className="text-lg font-semibold text-foreground">Resume Builder</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Select a template, fill in the values — instant DOCX output, no AI.
-        </p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-8 py-6">

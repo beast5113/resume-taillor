@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 
 const ALL_NAV = [
   { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard, roles: ["admin"] },
-  { href: "/kanban",       label: "Kanban",       icon: Kanban,          roles: ["admin"]},
+  { href: "/job-board",    label: "Job Board",    icon: Kanban,          roles: ["admin"]},
   { href: "/applications", label: "Applications", icon: Briefcase,       roles: ["admin", "assistant"] },
   { href: "/prompts",      label: "Prompts",      icon: MessageSquare,   roles: ["admin"] },
   { href: "/contexts",     label: "Contexts",     icon: Layers,          roles: ["admin"] },

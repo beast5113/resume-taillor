@@ -109,13 +109,6 @@ export default function TemplatesPage() {
     <div className="h-full flex flex-col">
       <div className="px-8 py-6 border-b border-border shrink-0">
         <h1 className="text-lg font-semibold text-foreground">DOCX Templates</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Upload Word (.docx) templates with{" "}
-          <code className="text-[11px] bg-muted px-1 py-0.5 rounded">{"<<variable>>"}</code>{" "}
-          placeholders. Resume templates support any variables; cover letter templates only allow{" "}
-          <code className="text-[11px] bg-muted px-1 py-0.5 rounded">{"<<date>>"}</code> and{" "}
-          <code className="text-[11px] bg-muted px-1 py-0.5 rounded">{"<<letter>>"}</code>.
-        </p>
       </div>
 
       <div className="flex-1 overflow-hidden">
@@ -123,24 +116,6 @@ export default function TemplatesPage() {
 
           {/* ── Left: Upload ── */}
           <div className="w-105 shrink-0 overflow-y-auto px-8 py-8 space-y-6">
-
-            {/* How it works */}
-            <div className="section-card space-y-3">
-              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <FileText size={14} /> How to Build a Template
-              </h2>
-              <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                <li>Create your layout in Word (fonts, tables, columns).</li>
-                <li>
-                  Insert placeholders:{" "}
-                  <code className="text-[11px] bg-muted px-1 py-0.5 rounded">{"<<name>>"}</code>,{" "}
-                  <code className="text-[11px] bg-muted px-1 py-0.5 rounded">{"<<summary>>"}</code>,{" "}
-                  <code className="text-[11px] bg-muted px-1 py-0.5 rounded">{"<<experience-1-1>>"}</code>, etc.
-                </li>
-                <li>For cover letter templates use only <code className="text-[11px] bg-muted px-1 py-0.5 rounded">{"<<date>>"}</code> and <code className="text-[11px] bg-muted px-1 py-0.5 rounded">{"<<letter>>"}</code>.</li>
-                <li>Upload the .docx here — variables are parsed and stored automatically.</li>
-              </ol>
-            </div>
 
             {/* Upload form */}
             <div className="section-card space-y-4">

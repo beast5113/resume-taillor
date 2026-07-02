@@ -53,6 +53,7 @@ const PIPELINE_OPTIONS = [
   { value: "saved",        label: "Saved" },
   { value: "applied",      label: "Applied" },
   { value: "external",     label: "External" },
+  { value: "screening",    label: "Screening" },
   { value: "hr_interview", label: "HR Interview" },
   { value: "tech_1",       label: "Tech 1" },
   { value: "tech_2",       label: "Tech 2" },
@@ -64,6 +65,7 @@ const PIPELINE_COLORS: Record<string, string> = {
   saved:        "text-muted-foreground",
   applied:      "text-blue-500",
   external:     "text-cyan-500",
+  screening:    "text-pink-500",
   hr_interview: "text-yellow-500",
   tech_1:       "text-purple-500",
   tech_2:       "text-orange-500",
@@ -122,11 +124,12 @@ function ActionButtons({ app, deletingId, onOpenJd, onDelete, onUpload }: {
 }) {
   return (
     <div className="flex items-center gap-1.5 flex-nowrap">
-      <button onClick={() => onOpenJd(app)} title="View job description"
-        className="inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-all">
-        <FileText size={12} />
-      </button>
-      {app.job_url && <CopyButton url={app.job_url} />}
+      {app.job_url && (
+        <a href={app.job_url} target="_blank" rel="noopener noreferrer" title="Open job link"
+          className="inline-flex items-center gap-1.5 h-7 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-all">
+          <ExternalLink size={12} /><span>Job Link</span>
+        </a>
+      )}
       {app.status === "saved" && (
         <button onClick={() => onUpload(app)} title="Upload resume to Drive"
           className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent text-xs font-medium transition-all">
@@ -140,6 +143,10 @@ function ActionButtons({ app, deletingId, onOpenJd, onDelete, onUpload }: {
           <Download size={12} /><span>Download</span>
         </a>
       )}
+      <button onClick={() => onOpenJd(app)} title="View job description"
+        className="inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-all">
+        <FileText size={12} />
+      </button>
       <Button size="icon-sm" variant="ghost" onClick={() => onDelete(app.id)} disabled={deletingId === app.id}
         className="text-muted-foreground hover:text-destructive">
         <Trash2 size={13} />
@@ -160,6 +167,7 @@ export default function ApplicationsPage() {
   // Filters
   const [search, setSearch]                   = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [searchFullText, setSearchFullText]   = useState(false);
   const [profileId, setProfileId]             = useState("");
   const [bidderId, setBidderId]               = useState("");
   const [statusFilter, setStatusFilter]       = useState("");
@@ -167,6 +175,7 @@ export default function ApplicationsPage() {
   const [dateFrom, setDateFrom]               = useState("");
   const [dateTo, setDateTo]                   = useState("");
   const [page, setPage]                       = useState(1);
+  const [pageJump, setPageJump]               = useState("");
   const [refreshKey, setRefreshKey]           = useState(0);
 
   // UI state
@@ -178,8 +187,8 @@ export default function ApplicationsPage() {
   const [selectedIds, setSelectedIds]         = useState<Set<string>>(new Set());
   const [bulkUpdating, setBulkUpdating]       = useState(false);
   const [bulkStatusUpdating, setBulkStatusUpdating] = useState(false);
-  const [jdModal, setJdModal] = useState<{ open: boolean; loading: boolean; content: string | null; title: string }>({
-    open: false, loading: false, content: null, title: "",
+  const [jdModal, setJdModal] = useState<{ open: boolean; loading: boolean; content: string | null; title: string; role: string }>({
+    open: false, loading: false, content: null, title: "", role: "",
   });
   const [uploadModal, setUploadModal] = useState<{
     open: boolean; app: Application | null;
@@ -230,6 +239,7 @@ export default function ApplicationsPage() {
 
     const p = new URLSearchParams({ page: String(page) });
     if (debouncedSearch) p.set("search", debouncedSearch);
+    if (debouncedSearch && searchFullText) p.set("fullSearch", "1");
     if (profileId)       p.set("profileId", profileId);
     if (bidderId)        p.set("bidderId", bidderId);
     if (statusFilter)    p.set("status", statusFilter);
@@ -248,7 +258,7 @@ export default function ApplicationsPage() {
       .catch(() => { if (active) setLoading(false); });
 
     return () => { active = false; };
-  }, [refreshKey, page, debouncedSearch, profileId, bidderId, statusFilter, stageFilter, dateFrom, dateTo]);
+  }, [refreshKey, page, debouncedSearch, searchFullText, profileId, bidderId, statusFilter, stageFilter, dateFrom, dateTo]);
 
   // Background poll while any app is in-progress (no loading spinner)
   useEffect(() => {
@@ -258,7 +268,7 @@ export default function ApplicationsPage() {
   }, [applications]);
 
   const resetFilters = () => {
-    setSearch(""); setDebouncedSearch(""); setProfileId(""); setBidderId("");
+    setSearch(""); setDebouncedSearch(""); setSearchFullText(false); setProfileId(""); setBidderId("");
     setStatusFilter(""); setStageFilter(""); setDateFrom(""); setDateTo(""); setPage(1);
   };
 
@@ -276,7 +286,7 @@ export default function ApplicationsPage() {
   };
 
   const openJd = async (app: Application) => {
-    setJdModal({ open: true, loading: true, content: null, title: `${app.company_name} — ${app.role}` });
+    setJdModal({ open: true, loading: true, content: null, title: `${app.company_name} — ${app.role}`, role: app.role });
     const res = await fetch(`/api/applications/${app.id}`);
     if (res.ok) {
       const data = await res.json();
@@ -428,9 +438,6 @@ export default function ApplicationsPage() {
       <div className="px-4 sm:px-8 py-4 sm:py-6 border-b border-border flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-base sm:text-lg font-semibold text-foreground">Applications</h1>
-          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
-            Jobs submitted via Chrome extension — resumes generated and stored on Google Drive
-          </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setRefreshKey(k => k + 1)} className="shrink-0">
           <RefreshCw size={13} /><span className="hidden sm:inline">Refresh</span>
@@ -443,12 +450,20 @@ export default function ApplicationsPage() {
           {/* ── Filters ── */}
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex flex-col gap-0.5">
-              <div className="relative">
-                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                <Input placeholder="Search…" value={search}
-                  onChange={e => setSearch(e.target.value)} className="pl-8 h-8 text-sm w-48" />
+              <div className="relative flex items-center gap-1.5">
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <Input placeholder="Search…" value={search}
+                    onChange={e => setSearch(e.target.value)} className="pl-8 h-8 text-sm w-48" />
+                </div>
+                <label className="flex items-center gap-1 text-[11px] text-muted-foreground cursor-pointer select-none whitespace-nowrap" title="Also search job description">
+                  <input type="checkbox" checked={searchFullText}
+                    onChange={e => setSearchFullText(e.target.checked)}
+                    className="size-3.5 rounded border-input cursor-pointer accent-primary" />
+                  Entire search
+                </label>
               </div>
-              <p className="text-[11px] text-muted-foreground/60 pl-1">Company / role</p>
+              <p className="text-[11px] text-muted-foreground/60 pl-1">Company / role / seq{searchFullText ? " / job description" : ""}</p>
             </div>
 
             {profiles.length > 0 && (
@@ -587,10 +602,10 @@ export default function ApplicationsPage() {
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Profile</th>
                       {isAdmin && <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Bidder</th>}
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Stage</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Stage</th>
                       <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
@@ -626,20 +641,10 @@ export default function ApplicationsPage() {
                               ) : (
                                 <span className="font-medium text-foreground whitespace-nowrap">{app.company_name}</span>
                               )}
-                              {app.job_url && (
-                                <Tooltip.Provider>
-                                  <Tooltip.Root>
-                                    <Tooltip.Trigger render={<a href={app.job_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors shrink-0" />}>
-                                      <ExternalLink size={11} />
-                                    </Tooltip.Trigger>
-                                    <Tooltip.Portal>
-                                      <Tooltip.Positioner sideOffset={6}>
-                                        <Tooltip.Popup className="z-50 rounded-md bg-popover px-2.5 py-1 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10">{app.job_board ?? app.job_url}</Tooltip.Popup>
-                                      </Tooltip.Positioner>
-                                    </Tooltip.Portal>
-                                  </Tooltip.Root>
-                                </Tooltip.Provider>
-                              )}
+                              <button onClick={() => startEdit(app)} title="Edit"
+                                className="text-muted-foreground hover:text-primary transition-colors shrink-0">
+                                <Pencil size={11} />
+                              </button>
                             </div>
                           )}
                         </td>
@@ -664,6 +669,16 @@ export default function ApplicationsPage() {
                             {app.bidder_name ?? <span className="text-muted-foreground/30">—</span>}
                           </td>
                         )}
+
+                        <td className="px-4 py-3.5 text-muted-foreground text-xs whitespace-nowrap">{formatDate(app.created_at)}</td>
+
+                        {/* Notes */}
+                        <td className="px-4 py-3.5">
+                          <button onClick={() => openNotes(app)} title={app.notes ?? "Add note"}
+                            className={`inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent transition-all ${app.notes ? "text-primary hover:bg-accent" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}>
+                            <NotebookPen size={12} />
+                          </button>
+                        </td>
 
                         {/* Status */}
                         <td className="px-4 py-3.5">
@@ -692,16 +707,6 @@ export default function ApplicationsPage() {
                           </Select>
                         </td>
 
-                        <td className="px-4 py-3.5 text-muted-foreground text-xs whitespace-nowrap">{formatDate(app.created_at)}</td>
-
-                        {/* Notes */}
-                        <td className="px-4 py-3.5">
-                          <button onClick={() => openNotes(app)} title={app.notes ?? "Add note"}
-                            className={`inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent transition-all ${app.notes ? "text-primary hover:bg-accent" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}>
-                            <NotebookPen size={12} />
-                          </button>
-                        </td>
-
                         {/* Actions */}
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
@@ -717,13 +722,7 @@ export default function ApplicationsPage() {
                                 </button>
                               </>
                             ) : (
-                              <>
-                                <button onClick={() => startEdit(app)} title="Edit"
-                                  className="inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-all">
-                                  <Pencil size={12} />
-                                </button>
-                                <ActionButtons app={app} deletingId={deletingId} onOpenJd={openJd} onDelete={id => setConfirmDeleteId(id)} onUpload={openUpload} />
-                              </>
+                              <ActionButtons app={app} deletingId={deletingId} onOpenJd={openJd} onDelete={id => setConfirmDeleteId(id)} onUpload={openUpload} />
                             )}
                           </div>
                         </td>
@@ -805,6 +804,26 @@ export default function ApplicationsPage() {
                       className="size-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:pointer-events-none">
                       <ChevronRight size={14} />
                     </button>
+                    <form
+                      className="flex items-center gap-1.5 ml-1 pl-2 border-l border-border"
+                      onSubmit={e => {
+                        e.preventDefault();
+                        const n = parseInt(pageJump, 10);
+                        if (Number.isFinite(n)) setPage(Math.min(totalPages, Math.max(1, n)));
+                        setPageJump("");
+                      }}
+                    >
+                      <span className="text-muted-foreground/70">Go to</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={totalPages}
+                        value={pageJump}
+                        onChange={e => setPageJump(e.target.value)}
+                        placeholder={String(page)}
+                        className="h-7 w-14 px-1.5 text-xs text-center"
+                      />
+                    </form>
                   </div>
                 )}
               </div>
@@ -858,7 +877,7 @@ export default function ApplicationsPage() {
                 <Dialog.Description className="text-xs text-muted-foreground mt-0.5 truncate">{jdModal.title}</Dialog.Description>
               </div>
               <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                {jdModal.content && <CopyButton url={jdModal.content} />}
+                {jdModal.content && <CopyButton url={`JOB Title:${jdModal.role}\n\nDescription:\n${jdModal.content}`} />}
                 <Dialog.Close render={<button className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"><X size={14} /></button>} />
               </div>
             </div>

@@ -25,8 +25,11 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  const allowed = ["pipeline_status", "status", "role", "company_name", "notes"] as const;
-  const update: Record<string, string | null> = {};
+  const allowed = [
+    "pipeline_status", "status", "role", "company_name", "notes",
+    "recruiter_name", "recruiter_email", "recruiter_phone", "scheduled_meeting_at", "meeting_done",
+  ] as const;
+  const update: Record<string, string | boolean | null> = {};
   for (const key of allowed) {
     if (key in body) update[key] = body[key];
   }
@@ -38,7 +41,7 @@ export async function PATCH(
     .from("applications")
     .update(update)
     .eq("id", id)
-    .select("id, seq, job_url, role, company_name, status, pipeline_status, google_drive_link, google_drive_file_id, error_message, notes, created_at, updated_at")
+    .select("id, seq, job_url, role, company_name, status, pipeline_status, google_drive_link, google_drive_file_id, error_message, notes, recruiter_name, recruiter_email, recruiter_phone, scheduled_meeting_at, meeting_done, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });

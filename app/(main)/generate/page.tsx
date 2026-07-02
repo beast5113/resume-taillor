@@ -99,12 +99,6 @@ export default function GeneratePage() {
     <div className="h-full flex flex-col">
       <div className="px-8 py-6 border-b border-border">
         <h1 className="text-lg font-semibold text-foreground">Generate Tailored Resume</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Select a template, provide your background, paste the job description — AI fills every
-          {"  "}
-          <code className="text-[11px] bg-muted px-1 py-0.5 rounded">{"<<variable>>"}</code>
-          {" "}placeholder and outputs a ready-to-send DOCX.
-        </p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-8 py-6">
