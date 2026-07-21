@@ -352,7 +352,14 @@ export default function ApplicationsPage() {
       body: JSON.stringify({ ids, status }),
     });
     if (res.ok) {
-      setApplications(prev => prev.map(a => selectedIds.has(a.id) ? { ...a, status: status as Application["status"] } : a));
+      const clearsResume = status === "pending" || status === "failed";
+      setApplications(prev => prev.map(a => selectedIds.has(a.id)
+        ? {
+            ...a,
+            status: status as Application["status"],
+            ...(clearsResume ? { google_drive_link: null, google_drive_file_id: null } : {}),
+          }
+        : a));
       setSelectedIds(new Set());
     }
     setBulkStatusUpdating(false);
@@ -547,7 +554,9 @@ export default function ApplicationsPage() {
                     <SelectValue placeholder={bulkStatusUpdating ? "Updating…" : "Set status…"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending" className="text-sm">Pending (BatchBuilder)</SelectItem>
+                    <SelectItem value="pending" className="text-sm">Pending</SelectItem>
+                    <SelectItem value="completed" className="text-sm">Completed</SelectItem>
+                    <SelectItem value="failed" className="text-sm">Failed</SelectItem>
                   </SelectContent>
                 </Select>
                 <button

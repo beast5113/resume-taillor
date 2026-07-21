@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { deleteFileFromDrive } from "@/lib/googleDrive";
 
-const ALLOWED_STATUSES = ["pending"];
+const ALLOWED_STATUSES = ["pending", "completed", "failed"];
+const STATUSES_THAT_CLEAR_RESUME = ["pending", "failed"];
 
 export async function PATCH(request: NextRequest) {
   const body = await request.json();
@@ -16,9 +18,30 @@ export async function PATCH(request: NextRequest) {
   if (status && !ALLOWED_STATUSES.includes(status))
     return NextResponse.json({ message: `status must be one of: ${ALLOWED_STATUSES.join(", ")}` }, { status: 400 });
 
-  const updatePayload: Record<string, string> = {};
+  const updatePayload: Record<string, string | null> = {};
   if (pipeline_status) updatePayload.pipeline_status = pipeline_status;
   if (status) updatePayload.status = status;
+
+  if (status && STATUSES_THAT_CLEAR_RESUME.includes(status)) {
+    const { data: apps } = await supabase
+      .from("applications")
+      .select("google_drive_file_id")
+      .in("id", ids)
+      .not("google_drive_file_id", "is", null);
+
+    await Promise.all(
+      (apps ?? []).map(async (app) => {
+        try {
+          await deleteFileFromDrive(app.google_drive_file_id as string);
+        } catch {
+          // Drive file may already be gone — continue
+        }
+      })
+    );
+
+    updatePayload.google_drive_file_id = null;
+    updatePayload.google_drive_link = null;
+  }
 
   const { error } = await supabase
     .from("applications")
