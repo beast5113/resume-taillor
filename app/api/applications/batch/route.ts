@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
-const ALLOWED_STATUSES = ["pending", "saved"];
+const ALLOWED_STATUSES = ["pending"];
 
 export async function PATCH(request: NextRequest) {
   const body = await request.json();

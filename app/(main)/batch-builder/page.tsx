@@ -23,6 +23,7 @@ interface Application {
   job_board: string | null;
   profile_id: string | null;
   profile_name: string | null;
+  template_id: string | null;
   status: string;
   pipeline_status: string;
   created_at: string;
@@ -80,7 +81,7 @@ function AppCard({
 }) {
   const [jsonInput, setJsonInput] = useState("");
   const [jsonInputError, setJsonInputError] = useState<string | null>(null);
-  const [templateId, setTemplateId] = useState("");
+  const [templateId, setTemplateId] = useState(app.template_id ?? "");
   const [selectedProfileId, setSelectedProfileId] = useState(app.profile_id ?? "");
   const [copied, setCopied] = useState(false);
 

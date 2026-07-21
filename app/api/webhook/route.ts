@@ -53,7 +53,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const templateId = shouldTailor ? (template_id?.trim() || process.env.DEFAULT_TEMPLATE_ID) : undefined;
+  const storedTemplateId = template_id?.trim() || null;
+  const templateId = shouldTailor ? (storedTemplateId || process.env.DEFAULT_TEMPLATE_ID) : undefined;
 
   let profileName = "";
   let resolvedProfileId: string | null = null;
@@ -78,8 +79,9 @@ export async function POST(request: NextRequest) {
       company_name: company_name.trim(),
       job_description: job_description?.trim() || null,
       profile_id: resolvedProfileId,
+      template_id: storedTemplateId,
       created_by: session.userId,
-      status: batch_mode === true ? "pending" : (shouldTailor ? (templateId ? "generating" : "pending") : "saved"),
+      status: shouldTailor && templateId ? "generating" : "pending",
       pipeline_status: "saved",
       job_board: job_board?.trim() || null,
     })

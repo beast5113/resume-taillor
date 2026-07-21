@@ -26,7 +26,7 @@ interface Application {
   profile_name: string | null;
   bidder_name: string | null;
   created_by: string | null;
-  status: "generating" | "completed" | "failed" | "pending" | "saved";
+  status: "generating" | "completed" | "failed" | "pending";
   pipeline_status: string;
   google_drive_link: string | null;
   google_drive_file_id: string | null;
@@ -46,7 +46,6 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   generating: "outline",
   completed:  "default",
   failed:     "destructive",
-  saved:      "secondary",
 };
 
 const PIPELINE_OPTIONS = [
@@ -73,7 +72,7 @@ const PIPELINE_COLORS: Record<string, string> = {
   failed:       "text-destructive",
 };
 
-const STATUS_OPTIONS = ["pending", "generating", "completed", "failed", "saved"];
+const STATUS_OPTIONS = ["pending", "generating", "completed", "failed"];
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -130,7 +129,7 @@ function ActionButtons({ app, deletingId, onOpenJd, onDelete, onUpload }: {
           <ExternalLink size={12} /><span>Job Link</span>
         </a>
       )}
-      {app.status === "saved" && (
+      {app.status === "pending" && (
         <button onClick={() => onUpload(app)} title="Upload resume to Drive"
           className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent text-xs font-medium transition-all">
           <Upload size={12} /><span>Upload</span>
@@ -549,7 +548,6 @@ export default function ApplicationsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pending" className="text-sm">Pending (BatchBuilder)</SelectItem>
-                    <SelectItem value="saved" className="text-sm">Saved</SelectItem>
                   </SelectContent>
                 </Select>
                 <button
