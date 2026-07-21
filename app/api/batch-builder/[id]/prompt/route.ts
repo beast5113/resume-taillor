@@ -3,19 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
 import { extractTemplateVariables } from "@/lib/docxTemplater";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/defaultSystemPrompt";
-
-function buildUserPrompt(variables: string[], backgroundInfo: string, jobDescription: string): string {
-  const expCount = variables.filter((v) => /^experience-bullet-group-\d+$/.test(v)).length || 3;
-  return `[Target Job Description]
-${jobDescription.trim()}
-
-[Resume Template and Candidate Context]
-${backgroundInfo.trim() || "(not provided — infer reasonable content from the job description)"}
-
-Template note: generate exactly ${expCount} entries in the experience array (one per job slot).
-
-Return the JSON object now.`;
-}
+import { buildUserPrompt } from "@/lib/promptBuilder";
 
 export async function GET(
   request: NextRequest,

@@ -10,38 +10,7 @@ import {
 } from "@/lib/docxTemplater";
 import { isValidModel, DEFAULT_MODEL } from "@/lib/models";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/defaultSystemPrompt";
-
-
-function buildUserPrompt(
-  variables: string[],
-  backgroundInfo: string,
-  jobDescription: string
-): string {
-  const expCount = variables.filter((v) => /^experience-bullet-group-\d+$/.test(v)).length || 3;
-  return `[Target Job Description]
-${jobDescription.trim()}
-
-[Resume Template and Candidate Context]
-${backgroundInfo.trim() || "(not provided — infer reasonable content from the job description)"}
-
-Template note: generate exactly ${expCount} entries in the experience array (one per job slot).
-
-Return the JSON object now.`;
-}
-
-function extractJson(text: string): Record<string, unknown> {
-  const trimmed = text.trim();
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-    if (start !== -1 && end > start) {
-      return JSON.parse(trimmed.slice(start, end + 1));
-    }
-    throw new Error("Could not parse JSON from model response");
-  }
-}
+import { buildUserPrompt, extractJsonAnswer } from "@/lib/promptBuilder";
 
 
 export interface GenerateOptions {
@@ -126,7 +95,7 @@ export async function generateFromTemplate(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawText = (response as any).choices?.[0]?.message?.content ?? "";
-  const aiValues = extractJson(rawText);
+  const aiValues = extractJsonAnswer(rawText);
 
   let buffer: Buffer;
   let nameForFile: string;
