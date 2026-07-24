@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
 import { extractTemplateVariables } from "@/lib/docxTemplater";
-import { DEFAULT_SYSTEM_PROMPT } from "@/lib/defaultSystemPrompt";
+import { resolveSystemPrompt } from "@/lib/promptResolution";
 import { buildUserPrompt } from "@/lib/promptBuilder";
 
 export async function GET(
@@ -70,14 +70,15 @@ export async function GET(
     ? `\n[Template Variables]\n${variables.join(", ")}\n`
     : "";
 
+  const systemPrompt = await resolveSystemPrompt(templateId);
   const fullPrompt = [
     "========== SYSTEM PROMPT ==========",
-    DEFAULT_SYSTEM_PROMPT,
+    systemPrompt,
     "",
     "========== USER PROMPT ==========",
     templateContext,
     userPrompt,
   ].join("\n");
 
-  return NextResponse.json({ systemPrompt: DEFAULT_SYSTEM_PROMPT, userPrompt, fullPrompt });
+  return NextResponse.json({ systemPrompt, userPrompt, fullPrompt });
 }

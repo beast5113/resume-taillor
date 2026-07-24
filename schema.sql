@@ -1015,6 +1015,7 @@ CREATE TABLE IF NOT EXISTS "public"."docx_templates" (
     "variables" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
     "template_type" "text" DEFAULT 'resume'::"text" NOT NULL,
     "profile_id" "uuid",
+    "prompt_id" "uuid",
     CONSTRAINT "docx_templates_template_type_check" CHECK (("template_type" = ANY (ARRAY['resume'::"text", 'cover_letter'::"text"])))
 );
 
@@ -1048,6 +1049,7 @@ CREATE TABLE IF NOT EXISTS "public"."prompts" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "name" "text" NOT NULL,
     "content" "text" DEFAULT ''::"text" NOT NULL,
+    "is_default" boolean DEFAULT false NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
@@ -1334,6 +1336,10 @@ CREATE INDEX "sessions_token_idx" ON "public"."sessions" USING "btree" ("token")
 
 
 
+CREATE UNIQUE INDEX "prompts_is_default_unique_idx" ON "public"."prompts" USING "btree" ("is_default") WHERE "is_default";
+
+
+
 CREATE UNIQUE INDEX "bname" ON "storage"."buckets" USING "btree" ("name");
 
 
@@ -1423,6 +1429,11 @@ ALTER TABLE ONLY "public"."applications"
 
 ALTER TABLE ONLY "public"."docx_templates"
     ADD CONSTRAINT "docx_templates_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."docx_templates"
+    ADD CONSTRAINT "docx_templates_prompt_id_fkey" FOREIGN KEY ("prompt_id") REFERENCES "public"."prompts"("id") ON DELETE SET NULL;
 
 
 

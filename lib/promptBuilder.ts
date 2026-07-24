@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { extractTemplateVariables } from "@/lib/docxTemplater";
-import { DEFAULT_SYSTEM_PROMPT } from "@/lib/defaultSystemPrompt";
+import { resolveSystemPrompt } from "@/lib/promptResolution";
 
 /**
  * Shared prompt-building + answer-parsing helpers used by every code path that
@@ -113,14 +113,15 @@ export async function assembleFullPrompt(
   const templateContext =
     variables.length > 0 ? `\n[Template Variables]\n${variables.join(", ")}\n` : "";
 
+  const systemPrompt = await resolveSystemPrompt(templateId);
   const fullPrompt = [
     "========== SYSTEM PROMPT ==========",
-    DEFAULT_SYSTEM_PROMPT,
+    systemPrompt,
     "",
     "========== USER PROMPT ==========",
     templateContext,
     userPrompt,
   ].join("\n");
 
-  return { systemPrompt: DEFAULT_SYSTEM_PROMPT, userPrompt, fullPrompt };
+  return { systemPrompt, userPrompt, fullPrompt };
 }

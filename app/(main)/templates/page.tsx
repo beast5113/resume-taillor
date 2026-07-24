@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Trash2, Loader2, UploadCloud, FileText, Check, AlertCircle, Tag, Mail } from "lucide-react";
-import { DocxTemplate } from "@/lib/types";
+import { Trash2, Loader2, UploadCloud, FileText, Check, AlertCircle, Tag, Mail, Download } from "lucide-react";
+import { DocxTemplate, Prompt } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 
 interface Profile { id: string; name: string; }
@@ -26,6 +26,7 @@ function TypeBadge({ type }: { type: "resume" | "cover_letter" }) {
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<DocxTemplate[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterProfileId, setFilterProfileId] = useState<string>("");
 
@@ -33,6 +34,7 @@ export default function TemplatesPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadType, setUploadType] = useState<"resume" | "cover_letter">("resume");
   const [uploadProfileId, setUploadProfileId] = useState("");
+  const [uploadPromptId, setUploadPromptId] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle");
   const [uploadError, setUploadError] = useState("");
@@ -41,12 +43,14 @@ export default function TemplatesPage() {
 
   const loadTemplates = async () => {
     setLoading(true);
-    const [tplRes, profileRes] = await Promise.all([
+    const [tplRes, profileRes, promptRes] = await Promise.all([
       fetch("/api/docx-templates").catch(() => null),
       fetch("/api/profiles").catch(() => null),
+      fetch("/api/prompts").catch(() => null),
     ]);
     if (tplRes?.ok) setTemplates(await tplRes.json());
     if (profileRes?.ok) setProfiles(await profileRes.json());
+    if (promptRes?.ok) setPrompts(await promptRes.json());
     setLoading(false);
   };
 
@@ -74,6 +78,7 @@ export default function TemplatesPage() {
     formData.append("file", uploadFile);
     formData.append("template_type", uploadType);
     if (uploadProfileId) formData.append("profile_id", uploadProfileId);
+    if (uploadPromptId) formData.append("prompt_id", uploadPromptId);
 
     try {
       const res = await fetch("/api/docx-templates", { method: "POST", body: formData });
@@ -87,6 +92,7 @@ export default function TemplatesPage() {
       setUploadFile(null);
       setUploadType("resume");
       setUploadProfileId("");
+      setUploadPromptId("");
       if (fileInputRef.current) fileInputRef.current.value = "";
       setUploadStatus("success");
     } catch (e) {
@@ -101,6 +107,18 @@ export default function TemplatesPage() {
     if (!confirm(`Delete template "${name}"? This cannot be undone.`)) return;
     await fetch(`/api/docx-templates/${id}`, { method: "DELETE" });
     setTemplates((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const handleReassignPrompt = async (templateId: string, promptId: string) => {
+    const res = await fetch(`/api/docx-templates/${templateId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt_id: promptId || null }),
+    });
+    if (res.ok) {
+      const updated: DocxTemplate = await res.json();
+      setTemplates((prev) => prev.map((t) => (t.id === templateId ? updated : t)));
+    }
   };
 
   const profileName = (id: string | null) => profiles.find((p) => p.id === id)?.name ?? null;
@@ -174,6 +192,21 @@ export default function TemplatesPage() {
                   value={uploadName}
                   onChange={(e) => { setUploadName(e.target.value); setUploadStatus("idle"); }}
                 />
+              </div>
+
+              {/* AI Prompt */}
+              <div>
+                <label className="field-label">AI Prompt</label>
+                <select
+                  className="field-input"
+                  value={uploadPromptId}
+                  onChange={(e) => setUploadPromptId(e.target.value)}
+                >
+                  <option value="">Use default prompt</option>
+                  {prompts.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}{p.is_default ? " (default)" : ""}</option>
+                  ))}
+                </select>
               </div>
 
               {/* File drop */}
@@ -265,6 +298,19 @@ export default function TemplatesPage() {
                           <p className="text-[11px] text-muted-foreground">
                             Uploaded {formatDate(t.created_at)} · ID: {t.id.slice(0, 8)}…
                           </p>
+                          <div className="mt-1.5">
+                            <select
+                              className="field-input text-[11px] py-0.5 w-44"
+                              value={t.prompt_id ?? ""}
+                              onChange={(e) => handleReassignPrompt(t.id, e.target.value)}
+                              title="AI prompt used to generate this template"
+                            >
+                              <option value="">Default prompt</option>
+                              {prompts.map((p) => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                          </div>
                           {t.variables?.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1">
                               <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/60 mr-1">
@@ -279,13 +325,22 @@ export default function TemplatesPage() {
                           )}
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDelete(t.id, t.name)}
-                        className="btn-ghost text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 p-2 shrink-0"
-                        title="Delete template"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <a
+                          href={`/api/docx-templates/${t.id}/download`}
+                          className="btn-ghost text-muted-foreground/50 hover:text-foreground hover:bg-muted p-2"
+                          title="Download template"
+                        >
+                          <Download size={14} />
+                        </a>
+                        <button
+                          onClick={() => handleDelete(t.id, t.name)}
+                          className="btn-ghost text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 p-2"
+                          title="Delete template"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

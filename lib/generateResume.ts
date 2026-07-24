@@ -9,7 +9,7 @@ import {
   type StructuredAIOutput,
 } from "@/lib/docxTemplater";
 import { isValidModel, DEFAULT_MODEL } from "@/lib/models";
-import { DEFAULT_SYSTEM_PROMPT } from "@/lib/defaultSystemPrompt";
+import { resolveSystemPrompt } from "@/lib/promptResolution";
 import { buildUserPrompt, extractJsonAnswer } from "@/lib/promptBuilder";
 
 
@@ -61,7 +61,7 @@ export async function generateFromTemplate(
   if (variables.length === 0) throw new Error("No <<variable>> placeholders found in template");
 
   const { promptContent, contextContent, modelId } = options;
-  const systemPrompt = promptContent?.trim() || DEFAULT_SYSTEM_PROMPT;
+  const systemPrompt = await resolveSystemPrompt(templateId, promptContent);
   const baseUserPrompt = buildUserPrompt(variables, backgroundInfo, jobDescription);
   const userPrompt = contextContent?.trim()
     ? `Additional context:\n${contextContent.trim()}\n\n${baseUserPrompt}`
