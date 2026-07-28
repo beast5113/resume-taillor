@@ -761,15 +761,19 @@ Example:
 
 ## Work Experience Rules
 
-Mapping variables: experience[].role_title, experience[].bullet_points, experience[].bold_words
+Mapping variables: experience[].role_title, experience[].role_summary, experience[].role_technologies, experience[].bullet_points, experience[].bold_words
 
 ### Role Summary Rules
+
+Mapping variable: experience[].role_summary
 
 For each role, write one short context line explaining the real product, platform, or workflow.
 
 ### Key Technologies Rules
 
-For each role, include a concise list of technologies credible for that role and time period.
+Mapping variable: experience[].role_technologies
+
+For each role, include a concise, comma-separated list of technologies credible for that role and time period.
 Only include technologies the candidate could plausibly explain for that role.
 
 ### Bullet Count Rules
@@ -861,6 +865,8 @@ Return exactly this structure:
   "experience": [
     {
       "role_title": "",
+      "role_summary": "",
+      "role_technologies": "",
       "bullet_points": ["", ""],
       "bold_words": ["", ""]
     }

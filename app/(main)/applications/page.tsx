@@ -208,8 +208,10 @@ export default function ApplicationsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // Clear selection when page or data changes
-  useEffect(() => { setSelectedIds(new Set()); }, [page, refreshKey]);
+  // Clear selection on page navigation only — not on the silent background poll
+  // (refreshKey also bumps every few seconds whenever a row is pending/generating,
+  // which would otherwise wipe the user's checkboxes mid-selection).
+  useEffect(() => { setSelectedIds(new Set()); }, [page]);
 
   // Load current user + filter option lists once on mount
   useEffect(() => {

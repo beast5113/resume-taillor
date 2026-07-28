@@ -13,7 +13,7 @@ export interface SkillGroup {
 export interface ExperienceEntry {
   role_title: string;
   role_summary?: string;
-  key_technologies?: string[];
+  role_technologies?: string;
   bullet_points: string[];
   bold_words: string[];
 }
@@ -88,6 +88,8 @@ export function mapStructuredToFlat(structured: StructuredAIOutput): Record<stri
   if (structured.profile_summary) flat["profile-summary"] = structured.profile_summary;
   structured.experience?.forEach((exp, i) => {
     flat[`role-title-${i + 1}`] = exp.role_title ?? "";
+    if (exp.role_summary) flat[`role-summary-${i + 1}`] = exp.role_summary;
+    if (exp.role_technologies) flat[`role-technologies-${i + 1}`] = exp.role_technologies;
   });
   return flat;
 }
@@ -110,6 +112,8 @@ export function getJsonCoveredVars(parsed: Record<string, unknown>): Set<string>
   }
   s.experience?.forEach((exp, i) => {
     if (exp.role_title) covered.add(`role-title-${i + 1}`);
+    if (exp.role_summary) covered.add(`role-summary-${i + 1}`);
+    if (exp.role_technologies) covered.add(`role-technologies-${i + 1}`);
     if (exp.bullet_points?.length) covered.add(`experience-bullet-group-${i + 1}`);
   });
   return covered;
