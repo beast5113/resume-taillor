@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { deleteFileFromDrive } from "@/lib/googleDrive";
+import { STATUSES_THAT_CLEAR_RESUME, resumeClearingFields } from "@/lib/applicationResumeCleanup";
 
 export async function GET(
   _: NextRequest,
@@ -36,6 +37,10 @@ export async function PATCH(
 
   if (Object.keys(update).length === 0)
     return NextResponse.json({ message: "No valid fields to update" }, { status: 400 });
+
+  if (typeof update.status === "string" && STATUSES_THAT_CLEAR_RESUME.includes(update.status)) {
+    Object.assign(update, await resumeClearingFields([id]));
+  }
 
   const { data, error } = await supabase
     .from("applications")

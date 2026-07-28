@@ -78,6 +78,18 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function isDiceJobUrl(url: string | null): boolean {
+  return !!url && /dice\.com\/job-detail\//i.test(url);
+}
+
+function DiceBadge() {
+  return (
+    <span title="Dice" className="inline-flex items-center justify-center size-3.5 rounded bg-red-500 text-white text-[9px] leading-none font-bold shrink-0">
+      D
+    </span>
+  );
+}
+
 function buildPageRange(current: number, total: number): (number | "…")[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const pages: (number | "…")[] = [1];
@@ -650,6 +662,7 @@ export default function ApplicationsPage() {
                               ) : (
                                 <span className="font-medium text-foreground whitespace-nowrap">{app.company_name}</span>
                               )}
+                              {isDiceJobUrl(app.job_url) && <DiceBadge />}
                               <button onClick={() => startEdit(app)} title="Edit"
                                 className="text-muted-foreground hover:text-primary transition-colors shrink-0">
                                 <Pencil size={11} />
@@ -752,6 +765,7 @@ export default function ApplicationsPage() {
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs text-muted-foreground tabular-nums">#{app.seq}</span>
                           <span className="font-semibold text-foreground text-sm truncate">{app.company_name}</span>
+                          {isDiceJobUrl(app.job_url) && <DiceBadge />}
                           {app.job_url && (
                             <a href={app.job_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary shrink-0">
                               <ExternalLink size={11} />
