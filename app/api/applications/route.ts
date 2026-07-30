@@ -18,8 +18,7 @@ export async function GET(request: NextRequest) {
   const status    = sp.get("status") ?? "";
   const stage     = sp.get("stage") ?? "";
   const stages    = sp.get("stages")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
-  const dateFrom  = sp.get("dateFrom") ?? "";
-  const dateTo    = sp.get("dateTo") ?? "";
+  const date      = sp.get("date") ?? "";
 
   const from = (page - 1) * pageSize;
   const to   = from + pageSize - 1;
@@ -52,8 +51,11 @@ export async function GET(request: NextRequest) {
   if (status)    query = query.eq("status", status);
   if (stage)     query = query.eq("pipeline_status", stage);
   if (stages.length) query = query.in("pipeline_status", stages);
-  if (dateFrom)  query = query.gte("created_at", `${dateFrom}T00:00:00.000Z`);
-  if (dateTo)    query = query.lte("created_at", `${dateTo}T23:59:59.999Z`);
+  if (date) {
+    query = query
+      .gte("created_at", `${date}T00:00:00.000Z`)
+      .lte("created_at", `${date}T23:59:59.999Z`);
+  }
 
   const { data, error, count } = await query;
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });

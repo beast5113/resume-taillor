@@ -183,8 +183,7 @@ export default function ApplicationsPage() {
   const [bidderId, setBidderId]               = useState("");
   const [statusFilter, setStatusFilter]       = useState("");
   const [stageFilter, setStageFilter]         = useState("");
-  const [dateFrom, setDateFrom]               = useState("");
-  const [dateTo, setDateTo]                   = useState("");
+  const [date, setDate]                       = useState("");
   const [page, setPage]                       = useState(1);
   const [pageJump, setPageJump]               = useState("");
   const [refreshKey, setRefreshKey]           = useState(0);
@@ -257,8 +256,7 @@ export default function ApplicationsPage() {
     if (bidderId)        p.set("bidderId", bidderId);
     if (statusFilter)    p.set("status", statusFilter);
     if (stageFilter)     p.set("stage", stageFilter);
-    if (dateFrom)        p.set("dateFrom", dateFrom);
-    if (dateTo)          p.set("dateTo", dateTo);
+    if (date)            p.set("date", date);
 
     fetch(`/api/applications?${p}`)
       .then(r => r.ok ? r.json() : null)
@@ -271,7 +269,7 @@ export default function ApplicationsPage() {
       .catch(() => { if (active) setLoading(false); });
 
     return () => { active = false; };
-  }, [refreshKey, page, debouncedSearch, searchFullText, profileId, bidderId, statusFilter, stageFilter, dateFrom, dateTo]);
+  }, [refreshKey, page, debouncedSearch, searchFullText, profileId, bidderId, statusFilter, stageFilter, date]);
 
   // Background poll while any app is in-progress (no loading spinner)
   useEffect(() => {
@@ -282,10 +280,10 @@ export default function ApplicationsPage() {
 
   const resetFilters = () => {
     setSearch(""); setDebouncedSearch(""); setSearchFullText(false); setProfileId(""); setBidderId("");
-    setStatusFilter(""); setStageFilter(""); setDateFrom(""); setDateTo(""); setPage(1);
+    setStatusFilter(""); setStageFilter(""); setDate(""); setPage(1);
   };
 
-  const hasActiveFilters = !!(search || profileId || bidderId || statusFilter || stageFilter || dateFrom || dateTo);
+  const hasActiveFilters = !!(search || profileId || bidderId || statusFilter || stageFilter || date);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Handlers
@@ -483,7 +481,6 @@ export default function ApplicationsPage() {
                   Entire search
                 </label>
               </div>
-              <p className="text-[11px] text-muted-foreground/60 pl-1">Company / role / seq{searchFullText ? " / job description" : ""}</p>
             </div>
 
             {profiles.length > 0 && (
@@ -495,7 +492,6 @@ export default function ApplicationsPage() {
                     {profiles.map(p => <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground/60 pl-1">Profile</p>
               </div>
             )}
 
@@ -508,7 +504,6 @@ export default function ApplicationsPage() {
                     {bidders.map(b => <SelectItem key={b.id} value={b.id} className="text-xs">{b.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground/60 pl-1">Bidder</p>
               </div>
             )}
 
@@ -520,7 +515,6 @@ export default function ApplicationsPage() {
                   {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s} className="text-xs capitalize">{s}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground/60 pl-1">Status</p>
             </div>
 
             <div className="flex flex-col gap-0.5">
@@ -531,63 +525,60 @@ export default function ApplicationsPage() {
                   {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground/60 pl-1">Stage</p>
             </div>
 
             <div className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-1.5">
-                <input type="date" className="field-input h-8 text-xs px-2 w-36" value={dateFrom}
-                  onChange={e => { setDateFrom(e.target.value); setPage(1); }} title="From date" />
-                <span className="text-muted-foreground text-xs">–</span>
-                <input type="date" className="field-input h-8 text-xs px-2 w-36" value={dateTo}
-                  onChange={e => { setDateTo(e.target.value); setPage(1); }} title="To date" />
-              </div>
-              <p className="text-[11px] text-muted-foreground/60 pl-1">Date range</p>
+              <input type="date" className="field-input h-8 text-xs px-2 w-36" value={date}
+                onChange={e => { setDate(e.target.value); setPage(1); }} title="Date" />
             </div>
 
             {hasActiveFilters && (
-              <button onClick={resetFilters}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-0.5">
-                <X size={11} /> Clear
-              </button>
+              <div className="flex flex-col gap-0.5">
+                <button onClick={resetFilters}
+                  className="h-8 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <X size={11} /> Clear
+                </button>
+              </div>
             )}
 
             {selectedIds.size > 0 && (
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-sm font-medium text-foreground whitespace-nowrap">{selectedIds.size} selected</span>
-                <Select onValueChange={(val: string | null) => { if (val) void handleBulkPipelineChange(val); }} disabled={bulkUpdating}>
-                  <SelectTrigger size="sm" className="h-8 text-sm w-auto min-w-36">
-                    <SelectValue placeholder={bulkUpdating ? "Updating…" : "Set stage…"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select onValueChange={(val: string | null) => { if (val) void handleBulkStatusChange(val); }} disabled={bulkStatusUpdating}>
-                  <SelectTrigger size="sm" className="h-8 text-sm w-auto min-w-36">
-                    <SelectValue placeholder={bulkStatusUpdating ? "Updating…" : "Set status…"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending" className="text-sm">Pending</SelectItem>
-                    <SelectItem value="completed" className="text-sm">Completed</SelectItem>
-                    <SelectItem value="failed" className="text-sm">Failed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <button
-                  onClick={() => {
-                    applications
-                      .filter(a => selectedIds.has(a.id) && a.job_url)
-                      .forEach(a => window.open(a.job_url!, "_blank", "noopener,noreferrer"));
-                  }}
-                  disabled={!applications.some(a => selectedIds.has(a.id) && a.job_url)}
-                  className="size-7 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:pointer-events-none"
-                  title="Open selected job URLs in new tabs">
-                  <ExternalLink size={13} />
-                </button>
-                <button onClick={() => setSelectedIds(new Set())}
-                  className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Clear selection">
-                  <X size={13} />
-                </button>
+              <div className="ml-auto flex flex-col gap-0.5">
+                <div className="h-8 flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground whitespace-nowrap">{selectedIds.size} selected</span>
+                  <Select onValueChange={(val: string | null) => { if (val) void handleBulkPipelineChange(val); }} disabled={bulkUpdating}>
+                    <SelectTrigger size="sm" className="h-8 text-sm w-auto min-w-36">
+                      <SelectValue placeholder={bulkUpdating ? "Updating…" : "Set stage…"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select onValueChange={(val: string | null) => { if (val) void handleBulkStatusChange(val); }} disabled={bulkStatusUpdating}>
+                    <SelectTrigger size="sm" className="h-8 text-sm w-auto min-w-36">
+                      <SelectValue placeholder={bulkStatusUpdating ? "Updating…" : "Set status…"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending" className="text-sm">Pending</SelectItem>
+                      <SelectItem value="completed" className="text-sm">Completed</SelectItem>
+                      <SelectItem value="failed" className="text-sm">Failed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <button
+                    onClick={() => {
+                      applications
+                        .filter(a => selectedIds.has(a.id) && a.job_url)
+                        .forEach(a => window.open(a.job_url!, "_blank", "noopener,noreferrer"));
+                    }}
+                    disabled={!applications.some(a => selectedIds.has(a.id) && a.job_url)}
+                    className="size-7 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                    title="Open selected job URLs in new tabs">
+                    <ExternalLink size={13} />
+                  </button>
+                  <button onClick={() => setSelectedIds(new Set())}
+                    className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Clear selection">
+                    <X size={13} />
+                  </button>
+                </div>
               </div>
             )}
           </div>
