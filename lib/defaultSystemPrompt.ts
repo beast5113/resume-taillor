@@ -902,4 +902,6 @@ Return only the completed JSON object.
 
 Do not include markdown, explanations, comments, analysis, code fences, or trailing commas.
 
-Use double quotes for all JSON keys and string values.`;
+Use double quotes for all JSON keys and string values.
+
+Never use a double quote character inside a string value (e.g. when naming a tool, quoting a term, or for emphasis). If you need to set off a word or phrase within a bullet, skill, or summary, use single quotes ('like this') instead - a literal " inside a string value breaks JSON parsing.`;
