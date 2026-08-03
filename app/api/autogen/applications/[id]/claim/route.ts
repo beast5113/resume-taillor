@@ -51,7 +51,8 @@ export async function POST(
   if (!claimable) return NextResponse.json({ application: null, reason: "not_claimable" });
 
   const priorStatus = app.status;
-  if (!(await tryClaimRow(app)))
+  const claimedAt = await tryClaimRow(app);
+  if (!claimedAt)
     return NextResponse.json({ application: null, reason: "not_claimable" });
 
   const prompt = await assembleFullPrompt(effectiveTemplateId, app);
@@ -69,6 +70,7 @@ export async function POST(
       created_at: app.created_at,
       job_description: app.job_description,
       rendered_prompt: prompt.fullPrompt,
+      autogen_claimed_at: claimedAt,
     },
   });
 }

@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
   for (const app of candidates ?? []) {
     const effectiveTemplateId = (app.template_id as string | null) || fallbackTemplateId;
     if (!effectiveTemplateId) continue;
-    if (!(await tryClaimRow(app))) continue; // lost the race to another lane/window
+    const claimedAt = await tryClaimRow(app);
+    if (!claimedAt) continue; // lost the race to another lane/window
 
     const prompt = await assembleFullPrompt(effectiveTemplateId, app);
     if (!prompt) {
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
         created_at: app.created_at,
         job_description: app.job_description,
         rendered_prompt: prompt.fullPrompt,
+        autogen_claimed_at: claimedAt,
       },
     });
   }
