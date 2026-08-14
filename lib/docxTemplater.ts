@@ -11,6 +11,9 @@ export interface SkillGroup {
 }
 
 export interface ExperienceEntry {
+  employment_context?: string;
+  end_client_name?: string;
+  end_client_website?: string;
   role_title: string;
   role_summary?: string;
   role_technologies?: string;
@@ -78,6 +81,94 @@ function buildBoldRuns(text: string, boldWords: string[], rPr: string): string {
     .join("");
 }
 
+// ─── Hyperlink placeholders (e.g. <<end-client-1>>) ──────────────────────────
+//
+// docxtemplater can only substitute plain text, not a real Word hyperlink
+// (that needs a <w:hyperlink> element plus a relationship). So a hyperlink
+// value is flattened into a sentinel-delimited string here, rendered as plain
+// text by docxtemplater like any other variable, then `injectHyperlinks`
+// finds that sentinel pattern in the rendered XML and swaps it for a real
+// hyperlink run + relationship. Uses a Private-Use-Area character (invalid in
+// normal resume content, and valid inside XML 1.0 text, unlike control chars).
+const HYPERLINK_SENTINEL = "";
+
+function encodeHyperlinkValue(text: string, url: string): string {
+  return `${HYPERLINK_SENTINEL}${text}${HYPERLINK_SENTINEL}${url}${HYPERLINK_SENTINEL}`;
+}
+
+/**
+ * LLMs asked for a URL often hand back a markdown link — `[label](url)` or
+ * `<url>` — instead of a bare one. A markdown-wrapped string isn't a valid
+ * absolute URI, so Word can't resolve it as External and silently falls back
+ * to treating it as a path relative to wherever the .docx was opened from.
+ * Unwraps those shapes and returns null if the result still isn't an
+ * absolute http(s) URL, so callers can skip the hyperlink instead of
+ * emitting a broken one.
+ */
+function sanitizeUrl(raw: string): string | null {
+  let url = raw.trim();
+  const markdownLink = url.match(/^\[[^\]]*\]\(([^)]+)\)$/);
+  if (markdownLink) url = markdownLink[1].trim();
+  const angleBracketed = url.match(/^<(.+)>$/);
+  if (angleBracketed) url = angleBracketed[1].trim();
+  return /^https?:\/\//i.test(url) ? url : null;
+}
+
+// Matches only a single, self-contained <w:r> produced by docxtemplater for a
+// sentinel-encoded tag: `(?!<\/?w:r\b)` stops the lazy rPr scan from crossing
+// into a neighboring run, which a plain `[\s\S]*?` would happily do via
+// backtracking across the whole document.
+const HYPERLINK_RUN_REGEX = new RegExp(
+  "<w:r\\b[^>]*>" +
+    `(<w:rPr>(?:(?!<\\/?w:r\\b)[\\s\\S])*?<\\/w:rPr>)?` +
+    `<w:t[^>]*>${HYPERLINK_SENTINEL}([^${HYPERLINK_SENTINEL}]*)${HYPERLINK_SENTINEL}([^${HYPERLINK_SENTINEL}]*)${HYPERLINK_SENTINEL}<\\/w:t>` +
+    "<\\/w:r>"
+);
+
+function nextRelationshipId(relsXml: string): number {
+  const ids = [...relsXml.matchAll(/Id="rId(\d+)"/g)].map((m) => parseInt(m[1], 10));
+  return (ids.length ? Math.max(...ids) : 0) + 1;
+}
+
+/**
+ * Finds every sentinel-encoded run left by docxtemplater's render() and
+ * rewrites it in place as a real Word hyperlink, adding one relationship per
+ * link to word/_rels/document.xml.rels. No-ops if nothing was encoded.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function injectHyperlinks(zip: any): void {
+  let xml = (zip.files["word/document.xml"] as { asText(): string }).asText();
+  if (!xml.includes(HYPERLINK_SENTINEL)) return;
+
+  const relsPath = "word/_rels/document.xml.rels";
+  let relsXml = (zip.files[relsPath] as { asText(): string } | undefined)?.asText() ??
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+  let nextId = nextRelationshipId(relsXml);
+
+  let match: RegExpMatchArray | null;
+  while ((match = xml.match(HYPERLINK_RUN_REGEX))) {
+    const [full, rPr, text, url] = match;
+    const relId = `rId${nextId++}`;
+
+    const inner = rPr?.match(/<w:rPr>([\s\S]*?)<\/w:rPr>/)?.[1] ?? "";
+    const withHyperlinkStyle = `<w:rStyle w:val="Hyperlink"/>${inner.replace(/<w:rStyle\s+w:val="[^"]*"\s*\/>/g, "")}`;
+    const run = `<w:r><w:rPr>${withHyperlinkStyle}</w:rPr><w:t>${xmlEscape(text)}</w:t></w:r>`;
+    const replacement = text ? `<w:hyperlink r:id="${relId}" w:history="1">${run}</w:hyperlink>` : "";
+
+    xml = xml.slice(0, match.index) + replacement + xml.slice((match.index ?? 0) + full.length);
+
+    if (text) {
+      relsXml = relsXml.replace(
+        "</Relationships>",
+        `<Relationship Id="${relId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${xmlEscape(url)}" TargetMode="External"/></Relationships>`
+      );
+    }
+  }
+
+  zip.file("word/document.xml", xml);
+  zip.file(relsPath, relsXml);
+}
+
 export function isStructuredOutput(obj: Record<string, unknown>): boolean {
   return Array.isArray(obj["skills"]) && Array.isArray(obj["experience"]);
 }
@@ -90,6 +181,13 @@ export function mapStructuredToFlat(structured: StructuredAIOutput): Record<stri
     flat[`role-title-${i + 1}`] = exp.role_title ?? "";
     if (exp.role_summary) flat[`role-summary-${i + 1}`] = exp.role_summary;
     if (exp.role_technologies) flat[`role-technologies-${i + 1}`] = exp.role_technologies;
+    if (exp.employment_context) flat[`employment-context-${i + 1}`] = exp.employment_context;
+    if (exp.end_client_name) {
+      const url = exp.end_client_website ? sanitizeUrl(exp.end_client_website) : null;
+      flat[`end-client-${i + 1}`] = url
+        ? encodeHyperlinkValue(exp.end_client_name, url)
+        : exp.end_client_name;
+    }
   });
   return flat;
 }
@@ -114,6 +212,8 @@ export function getJsonCoveredVars(parsed: Record<string, unknown>): Set<string>
     if (exp.role_title) covered.add(`role-title-${i + 1}`);
     if (exp.role_summary) covered.add(`role-summary-${i + 1}`);
     if (exp.role_technologies) covered.add(`role-technologies-${i + 1}`);
+    if (exp.employment_context) covered.add(`employment-context-${i + 1}`);
+    if (exp.end_client_name) covered.add(`end-client-${i + 1}`);
     if (exp.bullet_points?.length) covered.add(`experience-bullet-group-${i + 1}`);
   });
   return covered;
@@ -215,6 +315,7 @@ export function renderDocxTemplateStructured(
     }),
   });
   doc.render(flatData);
+  injectHyperlinks(doc.getZip());
 
   return doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
 }
@@ -243,6 +344,7 @@ export function renderDocxTemplate(
   });
 
   doc.render(data);
+  injectHyperlinks(doc.getZip());
 
   return doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
 }
