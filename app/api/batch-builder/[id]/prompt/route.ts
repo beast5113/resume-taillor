@@ -64,7 +64,7 @@ export async function GET(
   }
 
   const backgroundInfo = profileName ? `Name: ${profileName}` : "";
-  const userPrompt = buildUserPrompt(variables, backgroundInfo, app.job_description);
+  const userPrompt = buildUserPrompt(variables, backgroundInfo, app.job_description, app.role);
 
   const templateContext = variables.length > 0
     ? `\n[Template Variables]\n${variables.join(", ")}\n`

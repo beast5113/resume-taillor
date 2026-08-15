@@ -49,7 +49,7 @@ export async function POST(
   let filename: string;
 
   try {
-    ({ buffer, filename } = await generateFromTemplate(templateId, backgroundInfo, app.job_description));
+    ({ buffer, filename } = await generateFromTemplate(templateId, backgroundInfo, app.job_description, { role: app.role }));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ message: msg }, { status: 500 });

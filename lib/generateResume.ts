@@ -17,6 +17,10 @@ export interface GenerateOptions {
   promptContent?: string;
   contextContent?: string;
   modelId?: string;
+  /** The application's own job-title field - an explicit, reliable signal for
+   * `profile_title` generation instead of leaving the model to infer it from
+   * the job description text alone. */
+  role?: string | null;
 }
 
 export interface GenerateResult {
@@ -60,9 +64,9 @@ export async function generateFromTemplate(
 
   if (variables.length === 0) throw new Error("No <<variable>> placeholders found in template");
 
-  const { promptContent, contextContent, modelId } = options;
+  const { promptContent, contextContent, modelId, role } = options;
   const systemPrompt = await resolveSystemPrompt(templateId, promptContent);
-  const baseUserPrompt = buildUserPrompt(variables, backgroundInfo, jobDescription);
+  const baseUserPrompt = buildUserPrompt(variables, backgroundInfo, jobDescription, role);
   const userPrompt = contextContent?.trim()
     ? `Additional context:\n${contextContent.trim()}\n\n${baseUserPrompt}`
     : baseUserPrompt;

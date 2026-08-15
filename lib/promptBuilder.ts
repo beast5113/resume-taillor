@@ -14,14 +14,20 @@ import { resolveSystemPrompt } from "@/lib/promptResolution";
  * pastes into ChatGPT is byte-for-byte the same as the one the app builds.
  */
 
-/** Builds the user-prompt body from the template's variables + job context. */
+/** Builds the user-prompt body from the template's variables + job context.
+ * `role` (the application's own job-title field) is passed as an explicit,
+ * reliable signal for `profile_title` generation - otherwise the model has to
+ * infer the title from the job description text alone, which isn't always
+ * clearly stated there. */
 export function buildUserPrompt(
   variables: string[],
   backgroundInfo: string,
-  jobDescription: string
+  jobDescription: string,
+  role?: string | null
 ): string {
   const expCount = variables.filter((v) => /^experience-bullet-group-\d+$/.test(v)).length || 3;
-  return `[Target Job Description]
+  const roleBlock = role?.trim() ? `[Target Role]\n${role.trim()}\n\n` : "";
+  return `${roleBlock}[Target Job Description]
 ${jobDescription.trim()}
 
 [Resume Template and Candidate Context]
@@ -98,6 +104,7 @@ export function extractJsonAnswer(text: string): Record<string, unknown> {
 
 export interface PromptApplication {
   id: string;
+  role?: string | null;
   job_description?: string | null;
   profile_id?: string | null;
 }
@@ -154,7 +161,7 @@ export async function assembleFullPrompt(
   }
 
   const backgroundInfo = profileName ? `Name: ${profileName}` : "";
-  const userPrompt = buildUserPrompt(variables, backgroundInfo, app.job_description);
+  const userPrompt = buildUserPrompt(variables, backgroundInfo, app.job_description, app.role);
 
   const templateContext =
     variables.length > 0 ? `\n[Template Variables]\n${variables.join(", ")}\n` : "";

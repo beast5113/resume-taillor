@@ -99,7 +99,8 @@ export async function POST(request: NextRequest) {
         const { buffer, filename } = await generateFromTemplate(
           templateId,
           backgroundInfo,
-          job_description!.trim()
+          job_description!.trim(),
+          { role }
         );
 
         const baseName = profileName
