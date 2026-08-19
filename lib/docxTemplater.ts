@@ -152,7 +152,11 @@ function injectHyperlinks(zip: any): void {
 
     const inner = rPr?.match(/<w:rPr>([\s\S]*?)<\/w:rPr>/)?.[1] ?? "";
     const withHyperlinkStyle = `<w:rStyle w:val="Hyperlink"/>${inner.replace(/<w:rStyle\s+w:val="[^"]*"\s*\/>/g, "")}`;
-    const run = `<w:r><w:rPr>${withHyperlinkStyle}</w:rPr><w:t>${xmlEscape(text)}</w:t></w:r>`;
+    // `text`/`url` were captured straight out of the already-rendered document.xml,
+    // where docxtemplater's own render() already XML-escaped them once - re-escaping
+    // here would double-escape (e.g. "Crawford & Company" -> "&amp;" -> "&amp;amp;",
+    // which Word then displays as the literal text "&amp;").
+    const run = `<w:r><w:rPr>${withHyperlinkStyle}</w:rPr><w:t>${text}</w:t></w:r>`;
     const replacement = text ? `<w:hyperlink r:id="${relId}" w:history="1">${run}</w:hyperlink>` : "";
 
     xml = xml.slice(0, match.index) + replacement + xml.slice((match.index ?? 0) + full.length);
@@ -160,7 +164,7 @@ function injectHyperlinks(zip: any): void {
     if (text) {
       relsXml = relsXml.replace(
         "</Relationships>",
-        `<Relationship Id="${relId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${xmlEscape(url)}" TargetMode="External"/></Relationships>`
+        `<Relationship Id="${relId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${url}" TargetMode="External"/></Relationships>`
       );
     }
   }
