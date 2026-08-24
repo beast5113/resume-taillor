@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("applications")
-    .select("seq, role, company_name, pipeline_status, profiles(name)");
+    .select("seq, role, company_name, pipeline_status, created_at, profiles(name)");
 
   if (url) {
     query = query.ilike("job_url", `%${url}%`).limit(1);
