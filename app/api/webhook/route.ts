@@ -53,23 +53,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const storedTemplateId = template_id?.trim() || null;
-  const templateId = shouldTailor ? (storedTemplateId || process.env.DEFAULT_TEMPLATE_ID) : undefined;
-
   let profileName = "";
   let resolvedProfileId: string | null = null;
+  let profileDefaultTemplateId: string | null = null;
 
   if (profile_id?.trim()) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, name")
+      .select("id, name, default_template_id")
       .eq("id", profile_id.trim())
       .maybeSingle();
     if (profile) {
       resolvedProfileId = profile.id;
       profileName = profile.name ?? "";
+      profileDefaultTemplateId = profile.default_template_id ?? null;
     }
   }
+
+  // Extension-provided template wins; otherwise fall back to the profile's own
+  // default template, then to the instance-wide DEFAULT_TEMPLATE_ID (env-only,
+  // never persisted below since it isn't tied to any particular profile).
+  const storedTemplateId = template_id?.trim() || profileDefaultTemplateId;
+  const templateId = shouldTailor ? (storedTemplateId || process.env.DEFAULT_TEMPLATE_ID) : undefined;
 
   const { data: application, error: insertError } = await supabase
     .from("applications")

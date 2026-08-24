@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users } from "lucide-react";
+import { Users, FileText } from "lucide-react";
+import { Profile, DocxTemplate } from "@/lib/types";
 
-interface Profile { id: string; name: string; created_at: string; }
 interface TeamUser { id: string; name: string; email: string; }
 interface Assignment { id: string; profile_id: string; user_id: string; }
 
@@ -40,17 +40,23 @@ export default function ProfilePage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loadingAssignments, setLoadingAssignments] = useState(false);
 
+  // Templates available to assign as this profile's default
+  const [templates, setTemplates] = useState<DocxTemplate[]>([]);
+  const [savingDefaultTemplate, setSavingDefaultTemplate] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const [profileRes, userRes] = await Promise.all([
+    const [profileRes, userRes, templateRes] = await Promise.all([
       fetch("/api/profiles"),
       fetch("/api/team"),
+      fetch("/api/docx-templates"),
     ]);
     if (profileRes.ok) setProfiles(await profileRes.json());
     if (userRes.ok) {
       const users: (TeamUser & { role: string })[] = await userRes.json();
       setAllUsers(users.filter((u) => u.role === "assistant"));
     }
+    if (templateRes.ok) setTemplates(await templateRes.json());
     setLoading(false);
   }, []);
 
@@ -109,9 +115,26 @@ export default function ProfilePage() {
     await load();
   };
 
+  const setDefaultTemplate = async (profileId: string, templateId: string) => {
+    setSavingDefaultTemplate(true);
+    const res = await fetch(`/api/profiles/${profileId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ default_template_id: templateId || null }),
+    });
+    if (res.ok) {
+      const updated: Profile = await res.json();
+      setProfiles((prev) => prev.map((p) => (p.id === profileId ? updated : p)));
+    }
+    setSavingDefaultTemplate(false);
+  };
+
   const selectedProfile = profiles.find((p) => p.id === selectedId);
   const assignedUserIds = new Set(assignments.map((a) => a.user_id));
   const assignedUsers = allUsers.filter((u) => assignedUserIds.has(u.id));
+  const profileTemplates = selectedProfile
+    ? templates.filter((t) => t.profile_id === selectedProfile.id)
+    : [];
 
   return (
     <div className="flex h-full">
@@ -212,6 +235,41 @@ export default function ProfilePage() {
                   <p className="text-xs text-zinc-600">
                     Use this ID in your browser extension to associate submissions with this profile.
                   </p>
+                </div>
+              )}
+
+              {selectedId !== "new" && selectedProfile && (
+                <div>
+                  <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <FileText size={11} /> Default Template
+                  </p>
+                  {profileTemplates.length === 0 ? (
+                    <p className="text-xs text-zinc-600 italic">
+                      No templates created for this profile yet. Upload one from the{" "}
+                      <a href="/templates" className="text-zinc-400 underline hover:text-zinc-200">Templates page</a>{" "}
+                      and assign it to this profile, then it will show up here.
+                    </p>
+                  ) : (
+                    <>
+                      <select
+                        className="field-input text-xs w-full max-w-sm"
+                        value={selectedProfile.default_template_id ?? ""}
+                        disabled={savingDefaultTemplate}
+                        onChange={(e) => setDefaultTemplate(selectedProfile.id, e.target.value)}
+                      >
+                        <option value="">No default (webhook falls back to the instance default)</option>
+                        {profileTemplates.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} ({t.template_type === "cover_letter" ? "Cover letter" : "Resume"})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-zinc-600 mt-1.5">
+                        Used when a new application comes in (e.g. from the browser extension) without an
+                        explicit template — this profile's default is applied automatically.
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
 

@@ -27,6 +27,14 @@ export interface DocxTemplate {
   updated_at: string;
 }
 
+export interface Profile {
+  id: string;
+  name: string;
+  default_template_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProfileAssignment {
   id: string;
   profile_id: string;

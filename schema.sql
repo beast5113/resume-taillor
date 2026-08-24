@@ -1038,7 +1038,8 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "name" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "default_template_id" "uuid"
 );
 
 
@@ -1434,6 +1435,11 @@ ALTER TABLE ONLY "public"."docx_templates"
 
 ALTER TABLE ONLY "public"."docx_templates"
     ADD CONSTRAINT "docx_templates_prompt_id_fkey" FOREIGN KEY ("prompt_id") REFERENCES "public"."prompts"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."profiles"
+    ADD CONSTRAINT "profiles_default_template_id_fkey" FOREIGN KEY ("default_template_id") REFERENCES "public"."docx_templates"("id") ON DELETE SET NULL;
 
 
 

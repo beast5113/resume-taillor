@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("profiles")
-    .select("id, name")
+    .select("id, name, default_template_id, created_at, updated_at")
     .order("name", { ascending: true });
 
   if (session.role === "assistant") {
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from("profiles")
     .insert({ name: name.trim() })
-    .select("id, name, created_at")
+    .select("id, name, default_template_id, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
