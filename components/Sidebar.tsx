@@ -27,8 +27,8 @@ const ALL_NAV = [
   { href: "/contexts",     label: "Contexts",     icon: Layers,          roles: ["admin"] },
   { href: "/templates",    label: "Templates",    icon: LayoutTemplate,  roles: ["admin"] },
   { href: "/generate",     label: "Generate",     icon: Zap,             roles: ["admin"] },
-  { href: "/builder",       label: "Builder",       icon: Hammer,          roles: ["admin", "assistant"] },
-  { href: "/batch-builder", label: "BatchBuilder",  icon: PackageCheck,    roles: ["admin", "assistant"] },
+  { href: "/builder",       label: "Builder",       icon: Hammer,          roles: ["admin"] },
+  { href: "/batch-builder", label: "BatchBuilder",  icon: PackageCheck,    roles: ["admin"] },
   { href: "/profile",      label: "Profile",      icon: User,            roles: ["admin"] },
   { href: "/team",         label: "Team",         icon: Users,           roles: ["admin"] },
 ];

@@ -234,7 +234,7 @@ export default function ApplicationsPage() {
         if (admin) {
           fetch("/api/team")
             .then(r => r.ok ? r.json() : [])
-            .then((users: TeamUser[]) => setBidders(users.filter(u => u.role === "assistant")));
+            .then((users: TeamUser[]) => setBidders(users));
         }
       }
       if (profRes.ok) setProfiles(await profRes.json());

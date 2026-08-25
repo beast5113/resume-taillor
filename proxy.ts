@@ -3,7 +3,7 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 
 const ADMIN_ONLY = [
   "/dashboard", "/prompts", "/contexts", "/templates",
-  "/generate", "/profile", "/team",
+  "/generate", "/profile", "/team", "/builder", "/batch-builder",
 ];
 
 export async function proxy(request: NextRequest) {
