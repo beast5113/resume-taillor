@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { requireBearerAuth } from "@/lib/auth";
 import { extractJsonAnswer } from "@/lib/promptBuilder";
 import { uploadResumeToDrive } from "@/lib/googleDrive";
+import { buildResumeFilename } from "@/lib/resumeFilename";
 import {
   renderDocxTemplate,
   renderDocxTemplateStructured,
@@ -39,7 +40,7 @@ export async function POST(
 
     const { data: app } = await supabase
       .from("applications")
-      .select("id, seq, profile_id, template_id")
+      .select("id, profile_id, template_id, company_name")
       .eq("id", id)
       .maybeSingle();
     if (!app) return NextResponse.json({ status: "Error", detail: "Application not found." });
@@ -84,19 +85,28 @@ export async function POST(
     }
 
     let profileName = "";
+    let profileFirstName: string | null = null;
+    let profileLastName: string | null = null;
     if (app.profile_id) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("name")
+        .select("name, first_name, last_name")
         .eq("id", app.profile_id)
         .maybeSingle();
-      if (profile) profileName = profile.name ?? "";
+      if (profile) {
+        profileName = profile.name ?? "";
+        profileFirstName = profile.first_name;
+        profileLastName = profile.last_name;
+      }
     }
 
-    const baseName = profileName
-      ? profileName.replace(/[^a-zA-Z0-9]/g, "") + "Resume"
-      : tpl.name.replace(/\s+/g, "_");
-    const filename = app.seq ? `${baseName}_${app.seq}.docx` : `${baseName}.docx`;
+    const filename = buildResumeFilename(
+      profileFirstName,
+      profileLastName,
+      profileName,
+      app.company_name ?? "",
+      tpl.name.replace(/\s+/g, "_")
+    );
 
     const { fileId, driveLink } = await uploadResumeToDrive(buffer, filename);
 

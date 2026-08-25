@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
 import { generateFromTemplate } from "@/lib/generateResume";
+import { buildResumeFilename } from "@/lib/resumeFilename";
 
 export async function POST(
   request: NextRequest,
@@ -24,7 +25,7 @@ export async function POST(
 
   const { data: app } = await supabase
     .from("applications")
-    .select("id, seq, role, company_name, job_description, profile_id, status")
+    .select("id, role, company_name, job_description, profile_id, status")
     .eq("id", id)
     .single();
 
@@ -34,13 +35,19 @@ export async function POST(
     return NextResponse.json({ message: "No job description available for this application" }, { status: 400 });
 
   let profileName = "";
+  let profileFirstName: string | null = null;
+  let profileLastName: string | null = null;
   if (app.profile_id) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("name")
+      .select("name, first_name, last_name")
       .eq("id", app.profile_id)
       .single();
-    if (profile) profileName = profile.name ?? "";
+    if (profile) {
+      profileName = profile.name ?? "";
+      profileFirstName = profile.first_name;
+      profileLastName = profile.last_name;
+    }
   }
 
   const backgroundInfo = profileName ? `Name: ${profileName}` : "";
@@ -55,10 +62,13 @@ export async function POST(
     return NextResponse.json({ message: msg }, { status: 500 });
   }
 
-  const safeName = profileName
-    ? profileName.replace(/[^a-zA-Z0-9]/g, "") + "Resume"
-    : filename.replace(/\.docx$/i, "");
-  const driveFilename = app.seq ? `${safeName}_${app.seq}.docx` : `${safeName}.docx`;
+  const driveFilename = buildResumeFilename(
+    profileFirstName,
+    profileLastName,
+    profileName,
+    app.company_name,
+    filename.replace(/\.docx$/i, "")
+  );
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

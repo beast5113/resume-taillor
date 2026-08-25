@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { requireBearerAuth } from "@/lib/auth";
 import { generateFromTemplate } from "@/lib/generateResume";
 import { uploadResumeToDrive } from "@/lib/googleDrive";
+import { buildResumeFilename } from "@/lib/resumeFilename";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -54,18 +55,22 @@ export async function POST(request: NextRequest) {
   }
 
   let profileName = "";
+  let profileFirstName: string | null = null;
+  let profileLastName: string | null = null;
   let resolvedProfileId: string | null = null;
   let profileDefaultTemplateId: string | null = null;
 
   if (profile_id?.trim()) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, name, default_template_id")
+      .select("id, name, first_name, last_name, default_template_id")
       .eq("id", profile_id.trim())
       .maybeSingle();
     if (profile) {
       resolvedProfileId = profile.id;
       profileName = profile.name ?? "";
+      profileFirstName = profile.first_name;
+      profileLastName = profile.last_name;
       profileDefaultTemplateId = profile.default_template_id ?? null;
     }
   }
@@ -108,10 +113,13 @@ export async function POST(request: NextRequest) {
           { role }
         );
 
-        const baseName = profileName
-          ? profileName.replace(/[^a-zA-Z0-9]/g, "") + "Resume"
-          : filename.replace(/\.docx$/i, "");
-        const driveFilename = application.seq ? `${baseName}_${application.seq}.docx` : `${baseName}.docx`;
+        const driveFilename = buildResumeFilename(
+          profileFirstName,
+          profileLastName,
+          profileName,
+          company_name,
+          filename.replace(/\.docx$/i, "")
+        );
         const { fileId, driveLink } = await uploadResumeToDrive(buffer, driveFilename);
 
         await supabase

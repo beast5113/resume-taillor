@@ -30,6 +30,8 @@ export interface DocxTemplate {
 export interface Profile {
   id: string;
   name: string;
+  first_name: string | null;
+  last_name: string | null;
   default_template_id: string | null;
   created_at: string;
   updated_at: string;

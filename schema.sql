@@ -1039,7 +1039,9 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "name" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "default_template_id" "uuid"
+    "default_template_id" "uuid",
+    "first_name" "text",
+    "last_name" "text"
 );
 
 

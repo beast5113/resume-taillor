@@ -11,6 +11,12 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+/** Best-effort split for legacy profiles saved before first/last name existed. */
+function splitLegacyName(name: string): { first: string; last: string } {
+  const parts = name.trim().split(/\s+/);
+  return { first: parts[0] ?? "", last: parts.slice(1).join(" ") };
+}
+
 function PlusIcon() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -32,6 +38,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | "new" | null>(null);
   const [editName, setEditName] = useState("");
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -73,6 +81,14 @@ export default function ProfilePage() {
   const select = (p: Profile) => {
     setSelectedId(p.id);
     setEditName(p.name);
+    if (p.first_name && p.last_name) {
+      setEditFirstName(p.first_name);
+      setEditLastName(p.last_name);
+    } else {
+      const { first, last } = splitLegacyName(p.name);
+      setEditFirstName(first);
+      setEditLastName(last);
+    }
     setError("");
     loadAssignments(p.id);
   };
@@ -80,12 +96,17 @@ export default function ProfilePage() {
   const newProfile = () => {
     setSelectedId("new");
     setEditName("");
+    setEditFirstName("");
+    setEditLastName("");
     setError("");
     setAssignments([]);
   };
 
   const save = async () => {
-    if (!editName.trim()) { setError("Name is required"); return; }
+    if (!editName.trim() || !editFirstName.trim() || !editLastName.trim()) {
+      setError("Name, first name, and last name are required");
+      return;
+    }
     setSaving(true);
     setError("");
     const isNew = selectedId === "new";
@@ -94,7 +115,7 @@ export default function ProfilePage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName }),
+      body: JSON.stringify({ name: editName, first_name: editFirstName, last_name: editLastName }),
     });
     if (!res.ok) {
       const { message } = await res.json().catch(() => ({ message: "Save failed" }));
@@ -199,22 +220,44 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div className="flex flex-col h-full">
-            <div className="px-6 py-4 border-b border-zinc-800 flex items-center gap-3">
-              <input
-                className="field-input text-base font-semibold flex-1"
-                placeholder="Full name (e.g. Benjamin Dong)"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && save()}
-              />
-              <button onClick={save} disabled={saving} className="btn-primary">
-                {saving ? "Saving…" : selectedId === "new" ? "Create" : "Save"}
-              </button>
-              {selectedId !== "new" && (
-                <button onClick={() => deleteProfile(selectedId)} className="btn-ghost text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-2">
-                  <TrashIcon />
+            <div className="px-6 py-4 border-b border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-3">
+                <input
+                  className="field-input text-base font-semibold flex-1"
+                  placeholder="Name (e.g. Benjamin Dong)"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && save()}
+                />
+                <button onClick={save} disabled={saving} className="btn-primary">
+                  {saving ? "Saving…" : selectedId === "new" ? "Create" : "Save"}
                 </button>
-              )}
+                {selectedId !== "new" && (
+                  <button onClick={() => deleteProfile(selectedId)} className="btn-ghost text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-2">
+                    <TrashIcon />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  className="field-input text-sm flex-1"
+                  placeholder="First name (e.g. Benjamin)"
+                  value={editFirstName}
+                  onChange={(e) => setEditFirstName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && save()}
+                />
+                <input
+                  className="field-input text-sm flex-1"
+                  placeholder="Last name (e.g. Dong)"
+                  value={editLastName}
+                  onChange={(e) => setEditLastName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && save()}
+                />
+              </div>
+              <p className="text-[11px] text-zinc-600">
+                Name is this profile&apos;s identifier (shown in lists — can be anything, e.g. to tell two
+                profiles for the same person apart). First/last name are used only to safely build resume filenames.
+              </p>
             </div>
 
             {error && (

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
+import { buildResumeFilename } from "@/lib/resumeFilename";
 import {
   renderDocxTemplate,
   renderDocxTemplateStructured,
@@ -33,7 +34,7 @@ export async function POST(
 
   const { data: app } = await supabase
     .from("applications")
-    .select("id, seq, profile_id")
+    .select("id, profile_id, company_name")
     .eq("id", id)
     .single();
 
@@ -66,19 +67,28 @@ export async function POST(
   }
 
   let profileName = "";
+  let profileFirstName: string | null = null;
+  let profileLastName: string | null = null;
   if (app.profile_id) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("name")
+      .select("name, first_name, last_name")
       .eq("id", app.profile_id)
       .single();
-    if (profile) profileName = profile.name ?? "";
+    if (profile) {
+      profileName = profile.name ?? "";
+      profileFirstName = profile.first_name;
+      profileLastName = profile.last_name;
+    }
   }
 
-  const baseName = profileName
-    ? profileName.replace(/[^a-zA-Z0-9]/g, "") + "Resume"
-    : tpl.name.replace(/\s+/g, "_");
-  const filename = app.seq ? `${baseName}_${app.seq}.docx` : `${baseName}.docx`;
+  const filename = buildResumeFilename(
+    profileFirstName,
+    profileLastName,
+    profileName,
+    app.company_name ?? "",
+    tpl.name.replace(/\s+/g, "_")
+  );
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

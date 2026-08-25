@@ -6,12 +6,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ message: "Invalid request body" }, { status: 400 });
 
-  const update: { name?: string; default_template_id?: string | null } = {};
+  const update: { name?: string; first_name?: string; last_name?: string; default_template_id?: string | null } = {};
 
   if ("name" in body) {
     const name = String(body.name ?? "").trim();
     if (!name) return NextResponse.json({ message: "name is required" }, { status: 400 });
     update.name = name;
+  }
+
+  if ("first_name" in body || "last_name" in body) {
+    const first_name = String(body.first_name ?? "").trim();
+    const last_name = String(body.last_name ?? "").trim();
+    if (!first_name || !last_name)
+      return NextResponse.json({ message: "first_name and last_name are required" }, { status: 400 });
+    update.first_name = first_name;
+    update.last_name = last_name;
   }
 
   if ("default_template_id" in body) {
@@ -40,7 +49,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .from("profiles")
     .update(update)
     .eq("id", id)
-    .select("id, name, default_template_id, created_at, updated_at")
+    .select("id, name, first_name, last_name, default_template_id, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
