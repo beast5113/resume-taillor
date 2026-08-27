@@ -197,6 +197,7 @@ export default function ApplicationsPage() {
   const [selectedIds, setSelectedIds]         = useState<Set<string>>(new Set());
   const [bulkUpdating, setBulkUpdating]       = useState(false);
   const [bulkStatusUpdating, setBulkStatusUpdating] = useState(false);
+  const [bulkBidderUpdating, setBulkBidderUpdating] = useState(false);
   const [jdModal, setJdModal] = useState<{ open: boolean; loading: boolean; content: string | null; title: string; role: string }>({
     open: false, loading: false, content: null, title: "", role: "",
   });
@@ -377,6 +378,25 @@ export default function ApplicationsPage() {
     setBulkStatusUpdating(false);
   };
 
+  const handleBulkBidderChange = async (bidderId: string) => {
+    if (selectedIds.size === 0 || !bidderId || !isAdmin) return;
+    setBulkBidderUpdating(true);
+    const ids = Array.from(selectedIds);
+    const res = await fetch("/api/applications/batch", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, created_by: bidderId }),
+    });
+    if (res.ok) {
+      const bidderName = bidders.find(b => b.id === bidderId)?.name ?? null;
+      setApplications(prev => prev.map(a => selectedIds.has(a.id)
+        ? { ...a, created_by: bidderId, bidder_name: bidderName }
+        : a));
+      setSelectedIds(new Set());
+    }
+    setBulkBidderUpdating(false);
+  };
+
   const startEdit = (app: Application) => {
     setEditingId(app.id);
     setEditFields({ company_name: app.company_name, role: app.role });
@@ -466,27 +486,31 @@ export default function ApplicationsPage() {
         <div className="space-y-4">
 
           {/* ── Filters ── */}
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-wrap items-end gap-1.5">
             <div className="flex flex-col gap-0.5">
-              <div className="relative flex items-center gap-1.5">
+              <div className="relative flex items-center gap-1">
                 <div className="relative">
-                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                   <Input placeholder="Search…" value={search}
-                    onChange={e => setSearch(e.target.value)} className="pl-8 h-8 text-sm w-48" />
+                    onChange={e => setSearch(e.target.value)} className="pl-7 h-7 text-xs w-32" />
                 </div>
-                <label className="flex items-center gap-1 text-[11px] text-muted-foreground cursor-pointer select-none whitespace-nowrap" title="Also search job description">
+                <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer select-none whitespace-nowrap" title="Also search job description">
                   <input type="checkbox" checked={searchFullText}
                     onChange={e => setSearchFullText(e.target.checked)}
-                    className="size-3.5 rounded border-input cursor-pointer accent-primary" />
-                  Entire search
+                    className="size-3 rounded border-input cursor-pointer accent-primary" />
+                  Full text
                 </label>
               </div>
             </div>
 
             {profiles.length > 0 && (
               <div className="flex flex-col gap-0.5">
-                <Select value={profileId || "_all"} onValueChange={v => { setProfileId(v === "_all" ? "" : (v ?? "")); setPage(1); }}>
-                  <SelectTrigger className="h-8 text-sm w-auto min-w-36"><SelectValue /></SelectTrigger>
+                <Select
+                  value={profileId || "_all"}
+                  onValueChange={v => { setProfileId(v === "_all" ? "" : (v ?? "")); setPage(1); }}
+                  items={[{ value: "_all", label: "All profiles" }, ...profiles.map(p => ({ value: p.id, label: p.name }))]}
+                >
+                  <SelectTrigger className="h-7 text-xs w-auto min-w-24"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_all" className="text-xs">All profiles</SelectItem>
                     {profiles.map(p => <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>)}
@@ -497,8 +521,12 @@ export default function ApplicationsPage() {
 
             {isAdmin && bidders.length > 0 && (
               <div className="flex flex-col gap-0.5">
-                <Select value={bidderId || "_all"} onValueChange={v => { setBidderId(v === "_all" ? "" : (v ?? "")); setPage(1); }}>
-                  <SelectTrigger className="h-8 text-sm w-auto min-w-36"><SelectValue /></SelectTrigger>
+                <Select
+                  value={bidderId || "_all"}
+                  onValueChange={v => { setBidderId(v === "_all" ? "" : (v ?? "")); setPage(1); }}
+                  items={[{ value: "_all", label: "All bidders" }, ...bidders.map(b => ({ value: b.id, label: b.name }))]}
+                >
+                  <SelectTrigger className="h-7 text-xs w-auto min-w-24"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_all" className="text-xs">All bidders</SelectItem>
                     {bidders.map(b => <SelectItem key={b.id} value={b.id} className="text-xs">{b.name}</SelectItem>)}
@@ -508,8 +536,12 @@ export default function ApplicationsPage() {
             )}
 
             <div className="flex flex-col gap-0.5">
-              <Select value={statusFilter || "_all"} onValueChange={v => { setStatusFilter(v === "_all" ? "" : (v ?? "")); setPage(1); }}>
-                <SelectTrigger className="h-8 text-sm w-auto min-w-32"><SelectValue /></SelectTrigger>
+              <Select
+                value={statusFilter || "_all"}
+                onValueChange={v => { setStatusFilter(v === "_all" ? "" : (v ?? "")); setPage(1); }}
+                items={[{ value: "_all", label: "All statuses" }, ...STATUS_OPTIONS.map(s => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }))]}
+              >
+                <SelectTrigger className="h-7 text-xs w-auto min-w-20"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all" className="text-xs">All statuses</SelectItem>
                   {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s} className="text-xs capitalize">{s}</SelectItem>)}
@@ -518,8 +550,12 @@ export default function ApplicationsPage() {
             </div>
 
             <div className="flex flex-col gap-0.5">
-              <Select value={stageFilter || "_all"} onValueChange={v => { setStageFilter(v === "_all" ? "" : (v ?? "")); setPage(1); }}>
-                <SelectTrigger className="h-8 text-sm w-auto min-w-32"><SelectValue /></SelectTrigger>
+              <Select
+                value={stageFilter || "_all"}
+                onValueChange={v => { setStageFilter(v === "_all" ? "" : (v ?? "")); setPage(1); }}
+                items={[{ value: "_all", label: "All stages" }, ...PIPELINE_OPTIONS]}
+              >
+                <SelectTrigger className="h-7 text-xs w-auto min-w-20"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all" className="text-xs">All stages</SelectItem>
                   {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
@@ -528,14 +564,14 @@ export default function ApplicationsPage() {
             </div>
 
             <div className="flex flex-col gap-0.5">
-              <input type="date" className="field-input h-8 text-xs px-2 w-36" value={date}
+              <input type="date" className="field-input h-7 text-[11px] px-1.5 w-28" value={date}
                 onChange={e => { setDate(e.target.value); setPage(1); }} title="Date" />
             </div>
 
             {hasActiveFilters && (
               <div className="flex flex-col gap-0.5">
                 <button onClick={resetFilters}
-                  className="h-8 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  className="h-7 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <X size={11} /> Clear
                 </button>
               </div>
@@ -543,24 +579,34 @@ export default function ApplicationsPage() {
 
             {selectedIds.size > 0 && (
               <div className="ml-auto flex flex-col gap-0.5">
-                <div className="h-8 flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground whitespace-nowrap">{selectedIds.size} selected</span>
+                <div className="h-7 flex items-center gap-1.5">
+                  <span className="text-xs font-medium text-foreground whitespace-nowrap">{selectedIds.size} selected</span>
+                  {isAdmin && bidders.length > 0 && (
+                    <Select onValueChange={(val: string | null) => { if (val) void handleBulkBidderChange(val); }} disabled={bulkBidderUpdating}>
+                      <SelectTrigger size="sm" className="h-7 text-xs w-auto min-w-24">
+                        <SelectValue placeholder={bulkBidderUpdating ? "Updating…" : "Set bidder…"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {bidders.map(b => <SelectItem key={b.id} value={b.id} className="text-xs">{b.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Select onValueChange={(val: string | null) => { if (val) void handleBulkPipelineChange(val); }} disabled={bulkUpdating}>
-                    <SelectTrigger size="sm" className="h-8 text-sm w-auto min-w-36">
+                    <SelectTrigger size="sm" className="h-7 text-xs w-auto min-w-24">
                       <SelectValue placeholder={bulkUpdating ? "Updating…" : "Set stage…"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
+                      {PIPELINE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <Select onValueChange={(val: string | null) => { if (val) void handleBulkStatusChange(val); }} disabled={bulkStatusUpdating}>
-                    <SelectTrigger size="sm" className="h-8 text-sm w-auto min-w-36">
+                    <SelectTrigger size="sm" className="h-7 text-xs w-auto min-w-24">
                       <SelectValue placeholder={bulkStatusUpdating ? "Updating…" : "Set status…"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="pending" className="text-sm">Pending</SelectItem>
-                      <SelectItem value="completed" className="text-sm">Completed</SelectItem>
-                      <SelectItem value="failed" className="text-sm">Failed</SelectItem>
+                      <SelectItem value="pending" className="text-xs">Pending</SelectItem>
+                      <SelectItem value="completed" className="text-xs">Completed</SelectItem>
+                      <SelectItem value="failed" className="text-xs">Failed</SelectItem>
                     </SelectContent>
                   </Select>
                   <button
@@ -570,13 +616,13 @@ export default function ApplicationsPage() {
                         .forEach(a => window.open(a.job_url!, "_blank", "noopener,noreferrer"));
                     }}
                     disabled={!applications.some(a => selectedIds.has(a.id) && a.job_url)}
-                    className="size-7 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                    className="size-6 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:pointer-events-none"
                     title="Open selected job URLs in new tabs">
-                    <ExternalLink size={13} />
+                    <ExternalLink size={12} />
                   </button>
                   <button onClick={() => setSelectedIds(new Set())}
-                    className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Clear selection">
-                    <X size={13} />
+                    className="size-6 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Clear selection">
+                    <X size={12} />
                   </button>
                 </div>
               </div>
@@ -710,7 +756,7 @@ export default function ApplicationsPage() {
 
                         {/* Stage */}
                         <td className="px-4 py-3.5">
-                          <Select value={app.pipeline_status} onValueChange={val => val && handlePipelineChange(app.id, val)} disabled={updatingId === app.id}>
+                          <Select value={app.pipeline_status} onValueChange={val => val && handlePipelineChange(app.id, val)} disabled={updatingId === app.id} items={PIPELINE_OPTIONS}>
                             <SelectTrigger size="sm" className={`border-0 bg-transparent px-1.5 shadow-none focus-visible:ring-0 focus-visible:border-input h-8 text-sm font-medium ${PIPELINE_COLORS[app.pipeline_status] ?? "text-foreground"}`}>
                               <SelectValue />
                             </SelectTrigger>
@@ -774,7 +820,7 @@ export default function ApplicationsPage() {
                     </div>
                     {app.status === "failed" && app.error_message && <p className="text-xs text-destructive truncate">{app.error_message}</p>}
                     <div className="flex items-center justify-between gap-2">
-                      <Select value={app.pipeline_status} onValueChange={val => val && handlePipelineChange(app.id, val)} disabled={updatingId === app.id}>
+                      <Select value={app.pipeline_status} onValueChange={val => val && handlePipelineChange(app.id, val)} disabled={updatingId === app.id} items={PIPELINE_OPTIONS}>
                         <SelectTrigger size="sm" className={`border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 h-8 text-sm font-medium w-auto ${PIPELINE_COLORS[app.pipeline_status] ?? "text-foreground"}`}>
                           <SelectValue />
                         </SelectTrigger>
