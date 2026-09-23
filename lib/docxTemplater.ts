@@ -14,6 +14,10 @@ export interface ExperienceEntry {
   employment_context?: string;
   end_client_name?: string;
   end_client_website?: string;
+  company_name?: string;
+  company_website?: string;
+  company_city?: string;
+  company_state?: string;
   role_title: string;
   role_summary?: string;
   role_technologies?: string;
@@ -192,6 +196,14 @@ export function mapStructuredToFlat(structured: StructuredAIOutput): Record<stri
         ? encodeHyperlinkValue(exp.end_client_name, url)
         : exp.end_client_name;
     }
+    if (exp.company_name) {
+      const url = exp.company_website ? sanitizeUrl(exp.company_website) : null;
+      flat[`company-name-${i + 1}`] = url
+        ? encodeHyperlinkValue(exp.company_name, url)
+        : exp.company_name;
+    }
+    if (exp.company_city) flat[`company-city-${i + 1}`] = exp.company_city;
+    if (exp.company_state) flat[`company-state-${i + 1}`] = exp.company_state;
   });
   return flat;
 }
@@ -218,6 +230,9 @@ export function getJsonCoveredVars(parsed: Record<string, unknown>): Set<string>
     if (exp.role_technologies) covered.add(`role-technologies-${i + 1}`);
     if (exp.employment_context) covered.add(`employment-context-${i + 1}`);
     if (exp.end_client_name) covered.add(`end-client-${i + 1}`);
+    if (exp.company_name) covered.add(`company-name-${i + 1}`);
+    if (exp.company_city) covered.add(`company-city-${i + 1}`);
+    if (exp.company_state) covered.add(`company-state-${i + 1}`);
     if (exp.bullet_points?.length) covered.add(`experience-bullet-group-${i + 1}`);
   });
   return covered;
