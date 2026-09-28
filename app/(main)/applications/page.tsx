@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   RefreshCw, Download, ExternalLink, Trash2, Inbox,
   Search, ChevronLeft, ChevronRight, Copy, Check,
@@ -195,6 +195,7 @@ export default function ApplicationsPage() {
   const [editingId, setEditingId]             = useState<string | null>(null);
   const [editFields, setEditFields]           = useState({ company_name: "", role: "" });
   const [selectedIds, setSelectedIds]         = useState<Set<string>>(new Set());
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [bulkUpdating, setBulkUpdating]       = useState(false);
   const [bulkStatusUpdating, setBulkStatusUpdating] = useState(false);
   const [bulkBidderUpdating, setBulkBidderUpdating] = useState(false);
@@ -223,7 +224,7 @@ export default function ApplicationsPage() {
   // Clear selection on page navigation only — not on the silent background poll
   // (refreshKey also bumps every few seconds whenever a row is pending/generating,
   // which would otherwise wipe the user's checkboxes mid-selection).
-  useEffect(() => { setSelectedIds(new Set()); }, [page]);
+  useEffect(() => { setSelectedIds(new Set()); setLastSelectedIndex(null); }, [page]);
 
   // Load current user + filter option lists once on mount
   useEffect(() => {
@@ -327,6 +328,34 @@ export default function ApplicationsPage() {
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+
+  // A checkbox's `checked` DOM property is browser-owned: on click it flips
+  // (tentatively) before any handler runs, and — critically — if that click is
+  // ever preventDefault()'d, the browser reverts `checked` back to its pre-click
+  // value right after dispatch finishes, silently undoing whatever a React
+  // re-render just wrote in response. So range-selection can't preventDefault
+  // and drive `checked` itself from onClick; it has to ride the normal
+  // click-toggles-checked-then-fires-change flow. onClick only captures
+  // shiftKey (it always fires before change, for a checkbox); onChange — which
+  // reflects a real, committed checked-state flip — does the actual selection
+  // logic and lets React's controlled re-render reconcile `checked` from state.
+  const shiftKeyRef = useRef(false);
+  const handleCheckboxClick = (e: ReactMouseEvent<HTMLInputElement>) => { shiftKeyRef.current = e.shiftKey; };
+
+  const handleSelectChange = (id: string, index: number) => {
+    if (shiftKeyRef.current && lastSelectedIndex !== null) {
+      const [start, end] = lastSelectedIndex < index ? [lastSelectedIndex, index] : [index, lastSelectedIndex];
+      const rangeIds = applications.slice(start, end + 1).map(a => a.id);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        rangeIds.forEach(rid => next.add(rid));
+        return next;
+      });
+    } else {
+      toggleSelect(id);
+      setLastSelectedIndex(index);
+    }
+  };
 
   const allOnPageSelected = applications.length > 0 && applications.every(a => selectedIds.has(a.id));
   const someOnPageSelected = applications.some(a => selectedIds.has(a.id));
@@ -668,10 +697,11 @@ export default function ApplicationsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {applications.map(app => (
+                    {applications.map((app, index) => (
                       <tr key={app.id} className={`hover:bg-accent/30 transition-colors ${selectedIds.has(app.id) ? "bg-accent/20" : ""}`}>
                         <td className="px-4 py-3.5">
-                          <input type="checkbox" checked={selectedIds.has(app.id)} onChange={() => toggleSelect(app.id)}
+                          <input type="checkbox" checked={selectedIds.has(app.id)}
+                            onClick={handleCheckboxClick} onChange={() => handleSelectChange(app.id, index)}
                             className="size-4 rounded border-input cursor-pointer accent-primary" />
                         </td>
                         <td className="px-4 py-3.5 text-muted-foreground text-xs tabular-nums">{app.seq}</td>
@@ -793,10 +823,11 @@ export default function ApplicationsPage() {
 
               {/* ── Mobile cards ── */}
               <div className="md:hidden space-y-3">
-                {applications.map(app => (
+                {applications.map((app, index) => (
                   <div key={app.id} className={`bg-card rounded-xl ring-1 ring-foreground/10 p-4 space-y-3 ${selectedIds.has(app.id) ? "ring-primary/40 bg-accent/10" : ""}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <input type="checkbox" checked={selectedIds.has(app.id)} onChange={() => toggleSelect(app.id)}
+                      <input type="checkbox" checked={selectedIds.has(app.id)}
+                        onClick={handleCheckboxClick} onChange={() => handleSelectChange(app.id, index)}
                         className="mt-0.5 size-4 rounded border-input cursor-pointer accent-primary shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
