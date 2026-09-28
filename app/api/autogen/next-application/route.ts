@@ -16,12 +16,19 @@ const CANDIDATE_FIELDS =
  * default template is used as a fallback for applications that have none - when
  * that fallback is supplied, template-less applications are also claimable;
  * otherwise they are ignored.
+ *
+ * `?bidderId=` hard-restricts claimable applications to ones created by that
+ * team_user - lets one window run only a specific bidder's queue. Ignored for
+ * an `assistant`-role caller, since those are already always scoped to their
+ * own `created_by` below regardless of this param (mirrors /api/applications'
+ * existing bidderId precedent).
  */
 export async function GET(request: NextRequest) {
   const session = await requireBearerAuth(request);
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const fallbackTemplateId = request.nextUrl.searchParams.get("templateId")?.trim() || "";
+  const bidderId = request.nextUrl.searchParams.get("bidderId")?.trim() || "";
 
   let query = supabase
     .from("applications")
@@ -36,6 +43,7 @@ export async function GET(request: NextRequest) {
   if (!fallbackTemplateId) query = query.not("template_id", "is", null);
 
   if (session.role === "assistant") query = query.eq("created_by", session.userId);
+  else if (bidderId) query = query.eq("created_by", bidderId);
 
   const { data: candidates, error } = await query;
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
