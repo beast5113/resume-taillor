@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 
 const ADMIN_ONLY = [
-  "/dashboard", "/prompts", "/contexts", "/templates",
+  "/dashboard", "/prompts", "/templates",
   "/generate", "/profile", "/team", "/builder", "/batch-builder",
 ];
 

@@ -3,22 +3,20 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Loader2, Zap, MessageSquare, Layers, AlertCircle,
+  Loader2, Zap, MessageSquare, AlertCircle,
   FileText, Download, CheckCircle2, Tag,
 } from "lucide-react";
-import { Prompt, Context, DocxTemplate } from "@/lib/types";
+import { Prompt, DocxTemplate } from "@/lib/types";
 import { MODELS, DEFAULT_MODEL } from "@/lib/models";
 import { Button } from "@/components/ui/button";
 
 export default function GeneratePage() {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [contexts, setContexts] = useState<Context[]>([]);
   const [templates, setTemplates] = useState<DocxTemplate[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   const [templateId, setTemplateId] = useState("");
   const [promptId, setPromptId] = useState("");
-  const [contextId, setContextId] = useState("");
   const [modelId, setModelId] = useState(DEFAULT_MODEL);
   const [backgroundInfo, setBackgroundInfo] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -31,11 +29,9 @@ export default function GeneratePage() {
   useEffect(() => {
     Promise.all([
       fetch("/api/prompts").then((r) => r.json()).catch(() => []),
-      fetch("/api/contexts").then((r) => r.json()).catch(() => []),
       fetch("/api/docx-templates").then((r) => r.json()).catch(() => []),
-    ]).then(([pr, ctx, tpls]) => {
+    ]).then(([pr, tpls]) => {
       setPrompts(Array.isArray(pr) ? pr : []);
-      setContexts(Array.isArray(ctx) ? ctx : []);
       setTemplates(Array.isArray(tpls) ? tpls : []);
     }).finally(() => setLoadingData(false));
   }, []);
@@ -55,7 +51,6 @@ export default function GeneratePage() {
     if (downloadUrl) { URL.revokeObjectURL(downloadUrl); setDownloadUrl(null); }
 
     const selectedPrompt = prompts.find((p) => p.id === promptId);
-    const selectedContext = contexts.find((c) => c.id === contextId);
 
     try {
       const res = await fetch("/api/generate", {
@@ -66,7 +61,6 @@ export default function GeneratePage() {
           backgroundInfo: backgroundInfo.trim(),
           jobDescription: jobDescription.trim(),
           promptContent: selectedPrompt?.content,
-          contextContent: selectedContext?.content,
           modelId,
         }),
       });
@@ -152,15 +146,6 @@ export default function GeneratePage() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="field-label">Context</label>
-                  <select className="field-input" value={contextId} onChange={(e) => setContextId(e.target.value)}>
-                    <option value="">None</option>
-                    {contexts.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
               </div>
             )}
 
@@ -185,7 +170,7 @@ export default function GeneratePage() {
             )}
 
             {/* Active selection badges */}
-            {(templateId || promptId || contextId) && (
+            {(templateId || promptId) && (
               <div className="flex flex-wrap gap-2 pt-1">
                 {templateId && (
                   <span className="inline-flex items-center gap-1.5 bg-orange-500/15 border border-orange-500/30 rounded-full px-2.5 py-0.5 text-xs text-orange-400">
@@ -195,11 +180,6 @@ export default function GeneratePage() {
                 {promptId && (
                   <span className="inline-flex items-center gap-1.5 bg-violet-500/15 border border-violet-500/30 rounded-full px-2.5 py-0.5 text-xs text-violet-400">
                     <MessageSquare size={11} /> {prompts.find((p) => p.id === promptId)?.name}
-                  </span>
-                )}
-                {contextId && (
-                  <span className="inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 rounded-full px-2.5 py-0.5 text-xs text-emerald-400">
-                    <Layers size={11} /> {contexts.find((c) => c.id === contextId)?.name}
                   </span>
                 )}
               </div>

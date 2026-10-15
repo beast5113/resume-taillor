@@ -131,16 +131,16 @@ cp .env.example .env
      from the original project. It includes Supabase's own `storage` schema
      objects — a brand-new Supabase project already has those, so you may see
      harmless "already exists" notices for the `storage.*` statements; that's
-     expected and fine. What actually matters is that the **six `public.*`
-     application tables** get created: `applications`, `contexts`,
+     expected and fine. What actually matters is that the **`public.*`
+     application tables** get created: `applications`,
      `docx_templates`, `profile_assignments`, `profiles`, `prompts`, `sessions`,
-     `team_users` (that's 8 — count them all).
+     `team_users` (that's 7 — count them all).
    - Verify afterward with:
      ```sql
      select table_name from information_schema.tables
      where table_schema = 'public' order by 1;
      ```
-     You should see all 8 tables listed above.
+     You should see all 7 tables listed above.
 3. **Create the storage bucket**: go to **Storage** in the dashboard and create a
    new bucket named exactly:
    ```
@@ -248,8 +248,8 @@ until you seed a little data through the UI:
    default. If you skip this entirely, a hardcoded fallback prompt in
    `lib/defaultSystemPrompt.ts` is used — the app never breaks from having zero
    prompts configured.
-4. (Optional) **Profiles** / **Contexts** pages → add candidate background info /
-   reusable context snippets used when generating manually.
+4. (Optional) **Profiles** page → add candidate background info used when
+   generating manually.
 5. **Generate** or **Builder** page → paste a job description, pick a template, run
    a generation, confirm a `.docx` shows up in your configured Google Drive
    location.
@@ -338,7 +338,7 @@ Node.js host that can run `npm run build` + `npm run start` works too.
 app/
   (main)/            Authenticated UI pages: dashboard, builder, batch-builder,
                       generate, applications, job-board, templates, prompts,
-                      contexts, profile, team
+                      profile, team
   login/              Login page + server action
   api/                All backend routes (see Feature map below)
 components/           Shared React components (components/ui = shadcn-style primitives)
@@ -376,7 +376,6 @@ resumeBuilder.js                     Standalone one-off docx-building script
   optionally tied to a profile and a prompt.
 - **Prompts** — manage system prompts used for generation; one can be marked
   default.
-- **Contexts** — reusable background/context text snippets.
 - **Profile** — candidate profiles (name + assignable to assistants via
   `profile_assignments`).
 - **Team** — admin-only user management (create/disable team members, set roles).
@@ -387,7 +386,7 @@ Worth understanding before making changes, not necessarily things to "fix"
 unprompted:
 
 - **Row Level Security is off on every application table** (`applications`,
-  `contexts`, `docx_templates`, `profile_assignments`, `profiles`, `prompts`,
+  `docx_templates`, `profile_assignments`, `profiles`, `prompts`,
   `sessions`, `team_users`) — only Supabase's own `storage.*` tables have RLS
   enabled, inherited from the default Supabase setup. Access control for the app's
   own data lives entirely in the Next.js API routes (role checks, `requireSession`

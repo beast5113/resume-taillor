@@ -7,14 +7,6 @@ export interface Prompt {
   updated_at: string;
 }
 
-export interface Context {
-  id: string;
-  name: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface DocxTemplate {
   id: string;
   name: string;

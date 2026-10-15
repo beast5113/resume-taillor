@@ -994,18 +994,6 @@ ALTER SEQUENCE "public"."applications_seq_seq" OWNED BY "public"."applications".
 
 
 
-CREATE TABLE IF NOT EXISTS "public"."contexts" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "name" "text" NOT NULL,
-    "content" "text" DEFAULT ''::"text" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
-);
-
-
-ALTER TABLE "public"."contexts" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."docx_templates" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "name" "text" NOT NULL,
@@ -1235,9 +1223,6 @@ ALTER TABLE ONLY "public"."applications"
 
 
 
-ALTER TABLE ONLY "public"."contexts"
-    ADD CONSTRAINT "contexts_pkey" PRIMARY KEY ("id");
-
 
 
 ALTER TABLE ONLY "public"."docx_templates"
@@ -1378,8 +1363,6 @@ CREATE UNIQUE INDEX "vector_indexes_name_bucket_id_idx" ON "storage"."vector_ind
 CREATE OR REPLACE TRIGGER "applications_updated_at" BEFORE UPDATE ON "public"."applications" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
-
-CREATE OR REPLACE TRIGGER "contexts_updated_at" BEFORE UPDATE ON "public"."contexts" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
 
 
 
@@ -1543,9 +1526,6 @@ GRANT ALL ON SEQUENCE "public"."applications_seq_seq" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."contexts" TO "anon";
-GRANT ALL ON TABLE "public"."contexts" TO "authenticated";
-GRANT ALL ON TABLE "public"."contexts" TO "service_role";
 
 
 
