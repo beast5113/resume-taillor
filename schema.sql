@@ -1004,6 +1004,7 @@ CREATE TABLE IF NOT EXISTS "public"."docx_templates" (
     "template_type" "text" DEFAULT 'resume'::"text" NOT NULL,
     "profile_id" "uuid",
     "prompt_id" "uuid",
+    "notes" "text",
     CONSTRAINT "docx_templates_template_type_check" CHECK (("template_type" = ANY (ARRAY['resume'::"text", 'cover_letter'::"text"])))
 );
 

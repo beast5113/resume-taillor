@@ -42,7 +42,7 @@ export async function generateFromTemplate(
   // Fetch template metadata + file from Supabase
   const { data: tpl, error: tplError } = await supabase
     .from("docx_templates")
-    .select("name, storage_path, variables")
+    .select("name, storage_path, variables, notes")
     .eq("id", templateId)
     .single();
 
@@ -66,7 +66,7 @@ export async function generateFromTemplate(
 
   const { promptContent, contextContent, modelId, role } = options;
   const systemPrompt = await resolveSystemPrompt(templateId, promptContent);
-  const baseUserPrompt = buildUserPrompt(variables, backgroundInfo, jobDescription, role);
+  const baseUserPrompt = buildUserPrompt(variables, backgroundInfo, jobDescription, role, tpl.notes);
   const userPrompt = contextContent?.trim()
     ? `Additional context:\n${contextContent.trim()}\n\n${baseUserPrompt}`
     : baseUserPrompt;

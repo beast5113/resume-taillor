@@ -18,19 +18,24 @@ import { resolveSystemPrompt } from "@/lib/promptResolution";
  * `role` (the application's own job-title field) is passed as an explicit,
  * reliable signal for `profile_title` generation - otherwise the model has to
  * infer the title from the job description text alone, which isn't always
- * clearly stated there. */
+ * clearly stated there. `templateNotes` is the DOCX template's own saved
+ * "Additional Context" field (e.g. total years of experience, employment
+ * periods, career notes) - fixed per template, so it rides along on every
+ * generation against that template without the caller re-entering it. */
 export function buildUserPrompt(
   variables: string[],
   backgroundInfo: string,
   jobDescription: string,
-  role?: string | null
+  role?: string | null,
+  templateNotes?: string | null
 ): string {
   const expCount = variables.filter((v) => /^experience-bullet-group-\d+$/.test(v)).length || 3;
   const roleBlock = role?.trim() ? `[Target Role]\n${role.trim()}\n\n` : "";
+  const notesBlock = templateNotes?.trim() ? `[Additional Context]\n${templateNotes.trim()}\n\n` : "";
   return `${roleBlock}[Target Job Description]
 ${jobDescription.trim()}
 
-[Resume Template and Candidate Context]
+${notesBlock}[Resume Template and Candidate Context]
 ${backgroundInfo.trim() || "(not provided — infer reasonable content from the job description)"}
 
 Template note: generate exactly ${expCount} entries in the experience array (one per job slot).
@@ -132,7 +137,7 @@ export async function assembleFullPrompt(
 
   const { data: tpl, error: tplError } = await supabase
     .from("docx_templates")
-    .select("name, storage_path, variables")
+    .select("name, storage_path, variables, notes")
     .eq("id", templateId)
     .single();
 
@@ -161,7 +166,7 @@ export async function assembleFullPrompt(
   }
 
   const backgroundInfo = profileName ? `Name: ${profileName}` : "";
-  const userPrompt = buildUserPrompt(variables, backgroundInfo, app.job_description, app.role);
+  const userPrompt = buildUserPrompt(variables, backgroundInfo, app.job_description, app.role, tpl.notes);
 
   const templateContext =
     variables.length > 0 ? `\n[Template Variables]\n${variables.join(", ")}\n` : "";

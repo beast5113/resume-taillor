@@ -15,6 +15,7 @@ export interface DocxTemplate {
   template_type: "resume" | "cover_letter";
   profile_id: string | null;
   prompt_id: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }

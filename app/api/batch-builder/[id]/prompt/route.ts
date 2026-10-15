@@ -42,7 +42,7 @@ export async function GET(
 
   const { data: tpl, error: tplError } = await supabase
     .from("docx_templates")
-    .select("name, storage_path, variables")
+    .select("name, storage_path, variables, notes")
     .eq("id", templateId)
     .single();
 
@@ -64,7 +64,7 @@ export async function GET(
   }
 
   const backgroundInfo = profileName ? `Name: ${profileName}` : "";
-  const userPrompt = buildUserPrompt(variables, backgroundInfo, app.job_description, app.role);
+  const userPrompt = buildUserPrompt(variables, backgroundInfo, app.job_description, app.role, tpl.notes);
 
   const templateContext = variables.length > 0
     ? `\n[Template Variables]\n${variables.join(", ")}\n`

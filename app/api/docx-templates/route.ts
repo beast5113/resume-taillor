@@ -10,7 +10,7 @@ export async function GET() {
 
   let query = supabase
     .from("docx_templates")
-    .select("id, name, storage_path, variables, template_type, profile_id, prompt_id, created_at, updated_at")
+    .select("id, name, storage_path, variables, template_type, profile_id, prompt_id, notes, created_at, updated_at")
     .order("created_at", { ascending: true });
 
   if (session?.role === "assistant") {
@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
   const template_type = (formData.get("template_type") as string | null)?.trim() || "resume";
   const profile_id = (formData.get("profile_id") as string | null)?.trim() || null;
   const prompt_id = (formData.get("prompt_id") as string | null)?.trim() || null;
+  const notes = (formData.get("notes") as string | null)?.trim() || null;
 
   if (!name) return NextResponse.json({ message: "Name is required" }, { status: 400 });
   if (!file) return NextResponse.json({ message: "File is required" }, { status: 400 });
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("docx_templates")
-    .insert({ name, storage_path: storagePath, variables, template_type, profile_id: profile_id || null, prompt_id })
+    .insert({ name, storage_path: storagePath, variables, template_type, profile_id: profile_id || null, prompt_id, notes })
     .select()
     .single();
 

@@ -5,7 +5,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const { data, error } = await supabase
     .from("docx_templates")
-    .select("id, name, storage_path, created_at, updated_at")
+    .select("id, name, storage_path, notes, created_at, updated_at")
     .eq("id", id)
     .single();
 
@@ -16,16 +16,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await request.json().catch(() => null);
-  if (!body || !("prompt_id" in body))
+  if (!body || !("prompt_id" in body || "notes" in body))
     return NextResponse.json({ message: "No valid fields to update" }, { status: 400 });
 
-  const prompt_id: string | null = body.prompt_id || null;
+  const updates: Record<string, string | null> = {};
+  if ("prompt_id" in body) updates.prompt_id = body.prompt_id || null;
+  if ("notes" in body) updates.notes = (body.notes as string | null)?.trim() || null;
 
   const { data, error } = await supabase
     .from("docx_templates")
-    .update({ prompt_id })
+    .update(updates)
     .eq("id", id)
-    .select("id, name, storage_path, variables, template_type, profile_id, prompt_id, created_at, updated_at")
+    .select("id, name, storage_path, variables, template_type, profile_id, prompt_id, notes, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });

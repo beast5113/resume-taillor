@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Trash2, Loader2, UploadCloud, FileText, Check, AlertCircle, Tag, Mail, Download } from "lucide-react";
+import { Trash2, Loader2, UploadCloud, FileText, Check, AlertCircle, Tag, Mail, Download, NotebookPen, X } from "lucide-react";
+import { Dialog } from "@base-ui/react/dialog";
 import { DocxTemplate, Prompt } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 
@@ -35,9 +36,14 @@ export default function TemplatesPage() {
   const [uploadType, setUploadType] = useState<"resume" | "cover_letter">("resume");
   const [uploadProfileId, setUploadProfileId] = useState("");
   const [uploadPromptId, setUploadPromptId] = useState("");
+  const [uploadNotes, setUploadNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle");
   const [uploadError, setUploadError] = useState("");
+
+  const [notesModal, setNotesModal] = useState<{ open: boolean; template: DocxTemplate | null; draft: string; saving: boolean }>({
+    open: false, template: null, draft: "", saving: false,
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -79,6 +85,7 @@ export default function TemplatesPage() {
     formData.append("template_type", uploadType);
     if (uploadProfileId) formData.append("profile_id", uploadProfileId);
     if (uploadPromptId) formData.append("prompt_id", uploadPromptId);
+    if (uploadNotes.trim()) formData.append("notes", uploadNotes.trim());
 
     try {
       const res = await fetch("/api/docx-templates", { method: "POST", body: formData });
@@ -93,6 +100,7 @@ export default function TemplatesPage() {
       setUploadType("resume");
       setUploadProfileId("");
       setUploadPromptId("");
+      setUploadNotes("");
       if (fileInputRef.current) fileInputRef.current.value = "";
       setUploadStatus("success");
     } catch (e) {
@@ -119,6 +127,24 @@ export default function TemplatesPage() {
       const updated: DocxTemplate = await res.json();
       setTemplates((prev) => prev.map((t) => (t.id === templateId ? updated : t)));
     }
+  };
+
+  const openNotes = (t: DocxTemplate) =>
+    setNotesModal({ open: true, template: t, draft: t.notes ?? "", saving: false });
+
+  const saveNotes = async () => {
+    if (!notesModal.template) return;
+    setNotesModal((prev) => ({ ...prev, saving: true }));
+    const res = await fetch(`/api/docx-templates/${notesModal.template.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: notesModal.draft.trim() || null }),
+    });
+    if (res.ok) {
+      const updated: DocxTemplate = await res.json();
+      setTemplates((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    }
+    setNotesModal((prev) => ({ ...prev, open: false, saving: false }));
   };
 
   const profileName = (id: string | null) => profiles.find((p) => p.id === id)?.name ?? null;
@@ -207,6 +233,18 @@ export default function TemplatesPage() {
                     <option key={p.id} value={p.id}>{p.name}{p.is_default ? " (default)" : ""}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Notes / Additional Context */}
+              <div>
+                <label className="field-label">Notes / Additional Context</label>
+                <textarea
+                  className="field-input resize-none"
+                  rows={4}
+                  placeholder={"Total years of experience, employment periods, career notes…\n\nFed to the AI alongside the job description every time this template is used to generate a resume."}
+                  value={uploadNotes}
+                  onChange={(e) => setUploadNotes(e.target.value)}
+                />
               </div>
 
               {/* File drop */}
@@ -326,6 +364,13 @@ export default function TemplatesPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => openNotes(t)}
+                          title={t.notes ?? "Add notes / additional context"}
+                          className={`btn-ghost p-2 ${t.notes ? "text-primary hover:bg-accent" : "text-muted-foreground/50 hover:text-foreground hover:bg-muted"}`}
+                        >
+                          <NotebookPen size={14} />
+                        </button>
                         <a
                           href={`/api/docx-templates/${t.id}/download`}
                           className="btn-ghost text-muted-foreground/50 hover:text-foreground hover:bg-muted p-2"
@@ -350,6 +395,43 @@ export default function TemplatesPage() {
 
         </div>
       </div>
+
+      {/* Notes modal */}
+      <Dialog.Root open={notesModal.open} onOpenChange={(open) => { if (!open && !notesModal.saving) setNotesModal((prev) => ({ ...prev, open: false })); }}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 duration-150" />
+          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-md bg-card rounded-xl ring-1 ring-foreground/10 shadow-xl flex flex-col data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <div className="min-w-0">
+                <Dialog.Title className="text-sm font-semibold text-foreground">Notes / Additional Context</Dialog.Title>
+                <Dialog.Description className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {notesModal.template?.name ?? ""}
+                </Dialog.Description>
+              </div>
+              <Dialog.Close render={<button className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"><X size={14} /></button>} />
+            </div>
+            <div className="px-5 py-4">
+              <textarea
+                className="field-input w-full text-sm px-3 py-2 resize-none rounded-lg min-h-36"
+                placeholder="Total years of experience, employment periods, career notes…"
+                value={notesModal.draft}
+                onChange={(e) => setNotesModal((prev) => ({ ...prev, draft: e.target.value }))}
+                disabled={notesModal.saving}
+                autoFocus
+              />
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Sent to the AI alongside the job description every time this template is used to generate a resume.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 px-5 pb-5">
+              <Dialog.Close render={<Button variant="outline" size="sm" disabled={notesModal.saving}>Cancel</Button>} />
+              <Button size="sm" onClick={saveNotes} disabled={notesModal.saving}>
+                {notesModal.saving ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }
