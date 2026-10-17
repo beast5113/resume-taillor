@@ -22,6 +22,7 @@ interface Application {
   role: string;
   company_name: string;
   job_board: string | null;
+  salary: string | null;
   profile_id: string | null;
   profile_name: string | null;
   bidder_name: string | null;
@@ -745,7 +746,10 @@ export default function ApplicationsPage() {
                               onChange={e => setEditFields(f => ({ ...f, role: e.target.value }))}
                               onKeyDown={e => { if (e.key === "Enter") saveEdit(app.id); if (e.key === "Escape") cancelEdit(); }} />
                           ) : (
-                            <div className="truncate" title={app.role}>{app.role}</div>
+                            <div className="truncate" title={app.salary ? `${app.role} · ${app.salary}` : app.role}>
+                              {app.role}
+                              {app.salary && <span className="text-emerald-400/80 ml-1.5">· {app.salary}</span>}
+                            </div>
                           )}
                         </td>
 
@@ -840,7 +844,10 @@ export default function ApplicationsPage() {
                             </a>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{app.role}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {app.role}
+                          {app.salary && <span className="text-emerald-400/80 ml-1.5">· {app.salary}</span>}
+                        </p>
                         {app.profile_name && <p className="text-[11px] text-muted-foreground/60 truncate">{app.profile_name}</p>}
                         {isAdmin && app.bidder_name && <p className="text-[11px] text-muted-foreground/50 truncate">by {app.bidder_name}</p>}
                       </div>

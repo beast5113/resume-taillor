@@ -971,7 +971,8 @@ CREATE TABLE IF NOT EXISTS "public"."applications" (
     "recruiter_phone" "text",
     "scheduled_meeting_at" timestamp with time zone,
     "meeting_done" boolean DEFAULT false NOT NULL,
-    "autogen_claimed_at" timestamp with time zone
+    "autogen_claimed_at" timestamp with time zone,
+    "salary" "text"
 );
 
 

@@ -31,9 +31,10 @@ export async function POST(request: NextRequest) {
   let tailor_flag: boolean;
   let batch_mode: boolean | undefined;
   let job_board: string | undefined;
+  let salary: string | undefined;
 
   try {
-    ({ job_url, role, company_name, job_description, template_id, profile_id, tailor_flag, batch_mode, job_board } = await request.json());
+    ({ job_url, role, company_name, job_description, template_id, profile_id, tailor_flag, batch_mode, job_board, salary } = await request.json());
   } catch {
     return NextResponse.json({ message: "Invalid request body" }, { status: 400, headers: CORS_HEADERS });
   }
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
       status: shouldTailor && templateId ? "generating" : "pending",
       pipeline_status: "saved",
       job_board: job_board?.trim() || null,
+      salary: salary?.trim() || null,
     })
     .select()
     .single();
@@ -106,7 +108,7 @@ export async function POST(request: NextRequest) {
     after(async () => {
       try {
         const backgroundInfo = profileName ? `Name: ${profileName}` : "";
-        const { buffer, filename } = await generateFromTemplate(
+        const { buffer, filename, salary: extractedSalary } = await generateFromTemplate(
           templateId,
           backgroundInfo,
           job_description!.trim(),
@@ -124,7 +126,15 @@ export async function POST(request: NextRequest) {
 
         await supabase
           .from("applications")
-          .update({ status: "completed", google_drive_link: driveLink, google_drive_file_id: fileId })
+          .update({
+            status: "completed",
+            google_drive_link: driveLink,
+            google_drive_file_id: fileId,
+            // The extension-provided salary (set above, if any) always wins;
+            // this only fills the gap when that was null and the job description
+            // itself had a figure the model could extract.
+            ...(application.salary ? {} : extractedSalary ? { salary: extractedSalary } : {}),
+          })
           .eq("id", application.id);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

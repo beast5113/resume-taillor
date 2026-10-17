@@ -28,6 +28,11 @@ export interface ExperienceEntry {
 export interface StructuredAIOutput {
   profile_title: string;
   profile_summary: string;
+  /** Salary/rate extracted from the job description, if one was explicitly stated
+   * there (e.g. "$120,000 - $140,000" or "$75/hr"). Not rendered into the docx -
+   * callers use it to backfill `applications.salary` when that column is still
+   * null. Omitted/empty when the posting didn't mention one. */
+  salary?: string;
   skills: SkillGroup[];
   experience: ExperienceEntry[];
 }
@@ -179,6 +184,13 @@ function injectHyperlinks(zip: any): void {
 
 export function isStructuredOutput(obj: Record<string, unknown>): boolean {
   return Array.isArray(obj["skills"]) && Array.isArray(obj["experience"]);
+}
+
+/** Pulls the optional top-level `salary` field out of a parsed AI JSON object
+ * (structured or legacy-flat), trimmed, or `null` when absent/blank. Shared by
+ * every path that backfills `applications.salary` from a generation result. */
+export function extractSalary(parsed: Record<string, unknown>): string | null {
+  return typeof parsed["salary"] === "string" ? parsed["salary"].trim() || null : null;
 }
 
 export function mapStructuredToFlat(structured: StructuredAIOutput): Record<string, string> {

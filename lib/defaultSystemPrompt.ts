@@ -852,6 +852,15 @@ Only include words or short phrases that actually appear verbatim in the bullet_
 
 Examples: ["Python", "FastAPI", "LangGraph", "RAG", "OpenTelemetry", "PostgreSQL"]
 
+## Salary Rule
+
+Mapping variable: salary
+
+If the job description explicitly states a salary, rate, or compensation range
+(e.g. "$120,000 - $140,000", "$75/hr", "€90k"), copy it verbatim into the
+"salary" field. If no figure is stated anywhere in the job description, return
+"salary" as an empty string - never guess or estimate one.
+
 ## JSON Output Schema
 
 Return exactly this structure:
@@ -859,6 +868,7 @@ Return exactly this structure:
 {
   "profile_title": "",
   "profile_summary": "",
+  "salary": "",
   "skills": [
     { "category": "", "items": ["", ""] }
   ],
@@ -895,6 +905,7 @@ Before returning the JSON, silently verify:
 * No role sounds identical to another.
 * No wording is awkward, duplicated, merged, or AI-looking.
 * The candidate could explain every strong claim in an interview.
+* "salary" is either copied verbatim from the job description or an empty string - never invented.
 
 ## Final Output Rules
 

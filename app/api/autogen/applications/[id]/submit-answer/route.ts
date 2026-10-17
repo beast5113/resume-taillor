@@ -9,6 +9,7 @@ import {
   renderDocxTemplateStructured,
   isStructuredOutput,
   mapStructuredToFlat,
+  extractSalary,
   type StructuredAIOutput,
 } from "@/lib/docxTemplater";
 
@@ -40,7 +41,7 @@ export async function POST(
 
     const { data: app } = await supabase
       .from("applications")
-      .select("id, profile_id, template_id, company_name")
+      .select("id, profile_id, template_id, company_name, salary")
       .eq("id", id)
       .maybeSingle();
     if (!app) return NextResponse.json({ status: "Error", detail: "Application not found." });
@@ -110,6 +111,8 @@ export async function POST(
 
     const { fileId, driveLink } = await uploadResumeToDrive(buffer, filename);
 
+    const extractedSalary = extractSalary(jsonData);
+
     const { error: updateError } = await supabase
       .from("applications")
       .update({
@@ -118,6 +121,8 @@ export async function POST(
         google_drive_link: driveLink,
         error_message: null,
         autogen_claimed_at: null,
+        // Only fills the gap when the application had no salary already.
+        ...(app.salary || !extractedSalary ? {} : { salary: extractedSalary }),
       })
       .eq("id", id);
     if (updateError) return NextResponse.json({ status: "Error", detail: updateError.message });

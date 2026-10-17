@@ -6,6 +6,7 @@ import {
   extractTemplateVariables,
   isStructuredOutput,
   mapStructuredToFlat,
+  extractSalary,
   type StructuredAIOutput,
 } from "@/lib/docxTemplater";
 import { isValidModel, DEFAULT_MODEL } from "@/lib/models";
@@ -26,6 +27,11 @@ export interface GenerateOptions {
 export interface GenerateResult {
   buffer: Buffer;
   filename: string;
+  /** Salary/rate the model extracted verbatim from the job description, or
+   * `null` if the posting didn't state one. Callers tied to a specific
+   * `applications` row can use this to backfill that row's `salary` column
+   * when it's still unset. */
+  salary: string | null;
 }
 
 export async function generateFromTemplate(
@@ -120,5 +126,5 @@ export async function generateFromTemplate(
     .replace(/\s+/g, "_")
     .slice(0, 60);
 
-  return { buffer, filename: `${safeName}_resume.docx` };
+  return { buffer, filename: `${safeName}_resume.docx`, salary: extractSalary(aiValues) };
 }

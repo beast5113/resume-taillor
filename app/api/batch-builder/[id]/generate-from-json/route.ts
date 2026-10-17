@@ -7,6 +7,7 @@ import {
   renderDocxTemplateStructured,
   isStructuredOutput,
   mapStructuredToFlat,
+  extractSalary,
   type StructuredAIOutput,
 } from "@/lib/docxTemplater";
 
@@ -34,7 +35,7 @@ export async function POST(
 
   const { data: app } = await supabase
     .from("applications")
-    .select("id, profile_id, company_name")
+    .select("id, profile_id, company_name, salary")
     .eq("id", id)
     .single();
 
@@ -64,6 +65,16 @@ export async function POST(
     buffer = renderDocxTemplateStructured(templateBuffer, jsonData as unknown as StructuredAIOutput, flatData);
   } else {
     buffer = renderDocxTemplate(templateBuffer, jsonData as Record<string, string>);
+  }
+
+  // Backfill salary from the generated JSON if the application doesn't already
+  // have one (e.g. the extension created it with none, but the job description
+  // itself stated a figure the model picked up).
+  if (!app.salary) {
+    const extractedSalary = extractSalary(jsonData);
+    if (extractedSalary) {
+      await supabase.from("applications").update({ salary: extractedSalary }).eq("id", id);
+    }
   }
 
   let profileName = "";
