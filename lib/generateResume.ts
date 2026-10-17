@@ -32,6 +32,10 @@ export interface GenerateResult {
    * `applications` row can use this to backfill that row's `salary` column
    * when it's still unset. */
   salary: string | null;
+  /** The raw parsed JSON the model returned (structured or legacy-flat).
+   * Callers tied to a specific `applications` row store this verbatim in its
+   * `resume_json` column, as the record of what the resume was built from. */
+  resumeJson: Record<string, unknown>;
 }
 
 export async function generateFromTemplate(
@@ -126,5 +130,5 @@ export async function generateFromTemplate(
     .replace(/\s+/g, "_")
     .slice(0, 60);
 
-  return { buffer, filename: `${safeName}_resume.docx`, salary: extractSalary(aiValues) };
+  return { buffer, filename: `${safeName}_resume.docx`, salary: extractSalary(aiValues), resumeJson: aiValues };
 }

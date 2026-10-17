@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     after(async () => {
       try {
         const backgroundInfo = profileName ? `Name: ${profileName}` : "";
-        const { buffer, filename, salary: extractedSalary } = await generateFromTemplate(
+        const { buffer, filename, salary: extractedSalary, resumeJson } = await generateFromTemplate(
           templateId,
           backgroundInfo,
           job_description!.trim(),
@@ -130,6 +130,7 @@ export async function POST(request: NextRequest) {
             status: "completed",
             google_drive_link: driveLink,
             google_drive_file_id: fileId,
+            resume_json: resumeJson,
             // The extension-provided salary (set above, if any) always wins;
             // this only fills the gap when that was null and the job description
             // itself had a figure the model could extract.

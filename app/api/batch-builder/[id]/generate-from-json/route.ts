@@ -67,15 +67,15 @@ export async function POST(
     buffer = renderDocxTemplate(templateBuffer, jsonData as Record<string, string>);
   }
 
-  // Backfill salary from the generated JSON if the application doesn't already
-  // have one (e.g. the extension created it with none, but the job description
-  // itself stated a figure the model picked up).
-  if (!app.salary) {
-    const extractedSalary = extractSalary(jsonData);
-    if (extractedSalary) {
-      await supabase.from("applications").update({ salary: extractedSalary }).eq("id", id);
-    }
-  }
+  // Store the generated JSON verbatim (always the latest resume generated for
+  // this application), and backfill salary from it if the application doesn't
+  // already have one (e.g. the extension created it with none, but the job
+  // description itself stated a figure the model picked up).
+  const extractedSalary = app.salary ? null : extractSalary(jsonData);
+  await supabase
+    .from("applications")
+    .update({ resume_json: jsonData, ...(extractedSalary ? { salary: extractedSalary } : {}) })
+    .eq("id", id);
 
   let profileName = "";
   let profileFirstName: string | null = null;
