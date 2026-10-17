@@ -965,7 +965,6 @@ CREATE TABLE IF NOT EXISTS "public"."applications" (
     "seq" integer NOT NULL,
     "job_board" "text",
     "created_by" "uuid",
-    "notes" "text",
     "recruiter_name" "text",
     "recruiter_email" "text",
     "recruiter_phone" "text",

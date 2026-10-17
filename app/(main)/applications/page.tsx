@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 
 import {
   RefreshCw, Download, ExternalLink, Trash2, Inbox,
   Search, ChevronLeft, ChevronRight, Copy, Check,
-  AlertTriangle, FileText, X, Pencil, Upload, UploadCloud, NotebookPen, DollarSign,
+  AlertTriangle, FileText, X, Pencil, Upload, UploadCloud, DollarSign,
 } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Tooltip } from "@base-ui/react/tooltip";
@@ -32,7 +32,6 @@ interface Application {
   google_drive_link: string | null;
   google_drive_file_id: string | null;
   error_message: string | null;
-  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -208,10 +207,6 @@ export default function ApplicationsPage() {
     profileId: string; file: File | null;
     uploading: boolean; error: string | null; isDragging: boolean;
   }>({ open: false, app: null, profileId: "", file: null, uploading: false, error: null, isDragging: false });
-
-  const [notesModal, setNotesModal] = useState<{ open: boolean; app: Application | null; draft: string; saving: boolean }>({
-    open: false, app: null, draft: "", saving: false,
-  });
 
   const [salaryModal, setSalaryModal] = useState<{ open: boolean; app: Application | null; draft: string; saving: boolean }>({
     open: false, app: null, draft: "", saving: false,
@@ -456,24 +451,6 @@ export default function ApplicationsPage() {
     setUpdatingId(null);
   };
 
-  const openNotes = (app: Application) =>
-    setNotesModal({ open: true, app, draft: app.notes ?? "", saving: false });
-
-  const saveNotes = async () => {
-    if (!notesModal.app) return;
-    setNotesModal(prev => ({ ...prev, saving: true }));
-    const res = await fetch(`/api/applications/${notesModal.app.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes: notesModal.draft.trim() || null }),
-    });
-    if (res.ok) {
-      const updated: Application = await res.json();
-      setApplications(prev => prev.map(a => a.id === updated.id ? { ...a, notes: updated.notes } : a));
-    }
-    setNotesModal(prev => ({ ...prev, open: false, saving: false }));
-  };
-
   const openSalary = (app: Application) =>
     setSalaryModal({ open: true, app, draft: app.salary ?? "", saving: false });
 
@@ -713,7 +690,6 @@ export default function ApplicationsPage() {
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Profile</th>
                       {isAdmin && <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Bidder</th>}
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Salary</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Stage</th>
@@ -784,14 +760,6 @@ export default function ApplicationsPage() {
                         )}
 
                         <td className="px-4 py-3.5 text-muted-foreground text-xs whitespace-nowrap">{formatDate(app.created_at)}</td>
-
-                        {/* Notes */}
-                        <td className="px-4 py-3.5">
-                          <button onClick={() => openNotes(app)} title={app.notes ?? "Add note"}
-                            className={`inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent transition-all ${app.notes ? "text-primary hover:bg-accent" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}>
-                            <NotebookPen size={12} />
-                          </button>
-                        </td>
 
                         {/* Salary */}
                         <td className="px-4 py-3.5">
@@ -902,10 +870,6 @@ export default function ApplicationsPage() {
                           <DollarSign size={12} className="shrink-0" />
                           {app.salary ? <span className="truncate">{app.salary}</span> : null}
                         </button>
-                        <button onClick={() => openNotes(app)} title={app.notes ?? "Add note"}
-                          className={`inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent transition-all ${app.notes ? "text-primary hover:bg-accent" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}>
-                          <NotebookPen size={12} />
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -962,40 +926,6 @@ export default function ApplicationsPage() {
           )}
         </div>
       </div>
-
-      {/* Notes modal */}
-      <Dialog.Root open={notesModal.open} onOpenChange={open => { if (!open && !notesModal.saving) setNotesModal(prev => ({ ...prev, open: false })); }}>
-        <Dialog.Portal>
-          <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 duration-150" />
-          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-md bg-card rounded-xl ring-1 ring-foreground/10 shadow-xl flex flex-col data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-              <div className="min-w-0">
-                <Dialog.Title className="text-sm font-semibold text-foreground">Personal Note</Dialog.Title>
-                <Dialog.Description className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {notesModal.app ? `${notesModal.app.company_name} — ${notesModal.app.role}` : ""}
-                </Dialog.Description>
-              </div>
-              <Dialog.Close render={<button className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"><X size={14} /></button>} />
-            </div>
-            <div className="px-5 py-4">
-              <textarea
-                className="field-input w-full text-sm px-3 py-2 resize-none rounded-lg min-h-36"
-                placeholder="Contact info, recruiter details, interview notes…"
-                value={notesModal.draft}
-                onChange={e => setNotesModal(prev => ({ ...prev, draft: e.target.value }))}
-                disabled={notesModal.saving}
-                autoFocus
-              />
-            </div>
-            <div className="flex justify-end gap-2 px-5 pb-5">
-              <Dialog.Close render={<Button variant="outline" size="sm" disabled={notesModal.saving}>Cancel</Button>} />
-              <Button size="sm" onClick={saveNotes} disabled={notesModal.saving}>
-                {notesModal.saving ? "Saving…" : "Save"}
-              </Button>
-            </div>
-          </Dialog.Popup>
-        </Dialog.Portal>
-      </Dialog.Root>
 
       {/* Salary modal */}
       <Dialog.Root open={salaryModal.open} onOpenChange={open => { if (!open && !salaryModal.saving) setSalaryModal(prev => ({ ...prev, open: false })); }}>

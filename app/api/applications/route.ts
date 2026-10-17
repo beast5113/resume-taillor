@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from("applications")
     .select(
-      "id, seq, job_url, role, company_name, job_board, salary, status, pipeline_status, google_drive_link, google_drive_file_id, error_message, notes, recruiter_name, recruiter_email, recruiter_phone, scheduled_meeting_at, meeting_done, created_at, updated_at, created_by, profile_id, template_id, profiles(name), creator:team_users!created_by(name)",
+      "id, seq, job_url, role, company_name, job_board, salary, status, pipeline_status, google_drive_link, google_drive_file_id, error_message, recruiter_name, recruiter_email, recruiter_phone, scheduled_meeting_at, meeting_done, created_at, updated_at, created_by, profile_id, template_id, profiles(name), creator:team_users!created_by(name)",
       { count: "exact" }
     )
     .order("created_at", { ascending: false })
