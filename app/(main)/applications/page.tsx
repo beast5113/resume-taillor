@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 
 import {
   RefreshCw, Download, ExternalLink, Trash2, Inbox,
   Search, ChevronLeft, ChevronRight, Copy, Check,
-  AlertTriangle, FileText, X, Pencil, Upload, UploadCloud, NotebookPen,
+  AlertTriangle, FileText, X, Pencil, Upload, UploadCloud, NotebookPen, DollarSign,
 } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Tooltip } from "@base-ui/react/tooltip";
@@ -210,6 +210,10 @@ export default function ApplicationsPage() {
   }>({ open: false, app: null, profileId: "", file: null, uploading: false, error: null, isDragging: false });
 
   const [notesModal, setNotesModal] = useState<{ open: boolean; app: Application | null; draft: string; saving: boolean }>({
+    open: false, app: null, draft: "", saving: false,
+  });
+
+  const [salaryModal, setSalaryModal] = useState<{ open: boolean; app: Application | null; draft: string; saving: boolean }>({
     open: false, app: null, draft: "", saving: false,
   });
 
@@ -470,6 +474,24 @@ export default function ApplicationsPage() {
     setNotesModal(prev => ({ ...prev, open: false, saving: false }));
   };
 
+  const openSalary = (app: Application) =>
+    setSalaryModal({ open: true, app, draft: app.salary ?? "", saving: false });
+
+  const saveSalary = async () => {
+    if (!salaryModal.app) return;
+    setSalaryModal(prev => ({ ...prev, saving: true }));
+    const res = await fetch(`/api/applications/${salaryModal.app.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ salary: salaryModal.draft.trim() || null }),
+    });
+    if (res.ok) {
+      const updated: Application = await res.json();
+      setApplications(prev => prev.map(a => a.id === updated.id ? { ...a, salary: updated.salary } : a));
+    }
+    setSalaryModal(prev => ({ ...prev, open: false, saving: false }));
+  };
+
   const openUpload = (app: Application) =>
     setUploadModal({ open: true, app, profileId: "", file: null, uploading: false, error: null, isDragging: false });
 
@@ -692,6 +714,7 @@ export default function ApplicationsPage() {
                       {isAdmin && <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Bidder</th>}
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Salary</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Stage</th>
                       <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
@@ -746,10 +769,7 @@ export default function ApplicationsPage() {
                               onChange={e => setEditFields(f => ({ ...f, role: e.target.value }))}
                               onKeyDown={e => { if (e.key === "Enter") saveEdit(app.id); if (e.key === "Escape") cancelEdit(); }} />
                           ) : (
-                            <div className="truncate" title={app.salary ? `${app.role} · ${app.salary}` : app.role}>
-                              {app.role}
-                              {app.salary && <span className="text-emerald-400/80 ml-1.5">· {app.salary}</span>}
-                            </div>
+                            <div className="truncate" title={app.role}>{app.role}</div>
                           )}
                         </td>
 
@@ -770,6 +790,15 @@ export default function ApplicationsPage() {
                           <button onClick={() => openNotes(app)} title={app.notes ?? "Add note"}
                             className={`inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent transition-all ${app.notes ? "text-primary hover:bg-accent" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}>
                             <NotebookPen size={12} />
+                          </button>
+                        </td>
+
+                        {/* Salary */}
+                        <td className="px-4 py-3.5">
+                          <button onClick={() => openSalary(app)} title={app.salary ?? "Add salary"}
+                            className={`inline-flex items-center gap-1 h-7 px-2 rounded-lg border border-input bg-transparent text-xs transition-all max-w-28 ${app.salary ? "text-emerald-400 hover:bg-accent" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}>
+                            <DollarSign size={12} className="shrink-0" />
+                            {app.salary ? <span className="truncate">{app.salary}</span> : null}
                           </button>
                         </td>
 
@@ -844,10 +873,7 @@ export default function ApplicationsPage() {
                             </a>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {app.role}
-                          {app.salary && <span className="text-emerald-400/80 ml-1.5">· {app.salary}</span>}
-                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{app.role}</p>
                         {app.profile_name && <p className="text-[11px] text-muted-foreground/60 truncate">{app.profile_name}</p>}
                         {isAdmin && app.bidder_name && <p className="text-[11px] text-muted-foreground/50 truncate">by {app.bidder_name}</p>}
                       </div>
@@ -870,10 +896,17 @@ export default function ApplicationsPage() {
                     </div>
                     <div className="pt-1 border-t border-border flex items-center justify-between gap-2">
                       <ActionButtons app={app} deletingId={deletingId} onOpenJd={openJd} onDelete={id => setConfirmDeleteId(id)} onUpload={openUpload} />
-                      <button onClick={() => openNotes(app)} title={app.notes ?? "Add note"}
-                        className={`inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent transition-all shrink-0 ${app.notes ? "text-primary hover:bg-accent" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}>
-                        <NotebookPen size={12} />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => openSalary(app)} title={app.salary ?? "Add salary"}
+                          className={`inline-flex items-center gap-1 h-7 px-2 rounded-lg border border-input bg-transparent text-xs transition-all max-w-24 ${app.salary ? "text-emerald-400 hover:bg-accent" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}>
+                          <DollarSign size={12} className="shrink-0" />
+                          {app.salary ? <span className="truncate">{app.salary}</span> : null}
+                        </button>
+                        <button onClick={() => openNotes(app)} title={app.notes ?? "Add note"}
+                          className={`inline-flex items-center justify-center size-7 rounded-lg border border-input bg-transparent transition-all ${app.notes ? "text-primary hover:bg-accent" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}>
+                          <NotebookPen size={12} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -958,6 +991,44 @@ export default function ApplicationsPage() {
               <Dialog.Close render={<Button variant="outline" size="sm" disabled={notesModal.saving}>Cancel</Button>} />
               <Button size="sm" onClick={saveNotes} disabled={notesModal.saving}>
                 {notesModal.saving ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Salary modal */}
+      <Dialog.Root open={salaryModal.open} onOpenChange={open => { if (!open && !salaryModal.saving) setSalaryModal(prev => ({ ...prev, open: false })); }}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 duration-150" />
+          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-sm bg-card rounded-xl ring-1 ring-foreground/10 shadow-xl flex flex-col data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <div className="min-w-0">
+                <Dialog.Title className="text-sm font-semibold text-foreground">Salary</Dialog.Title>
+                <Dialog.Description className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {salaryModal.app ? `${salaryModal.app.company_name} — ${salaryModal.app.role}` : ""}
+                </Dialog.Description>
+              </div>
+              <Dialog.Close render={<button className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"><X size={14} /></button>} />
+            </div>
+            <div className="px-5 py-4">
+              <input
+                className="field-input w-full text-sm px-3 py-2 rounded-lg"
+                placeholder="e.g. $120,000 - $140,000"
+                value={salaryModal.draft}
+                onChange={e => setSalaryModal(prev => ({ ...prev, draft: e.target.value }))}
+                onKeyDown={e => { if (e.key === "Enter") saveSalary(); }}
+                disabled={salaryModal.saving}
+                autoFocus
+              />
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Auto-filled from the job description when a resume is generated, if not already set. Edit it here anytime.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 px-5 pb-5">
+              <Dialog.Close render={<Button variant="outline" size="sm" disabled={salaryModal.saving}>Cancel</Button>} />
+              <Button size="sm" onClick={saveSalary} disabled={salaryModal.saving}>
+                {salaryModal.saving ? "Saving…" : "Save"}
               </Button>
             </div>
           </Dialog.Popup>
