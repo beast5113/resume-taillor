@@ -74,7 +74,7 @@ export async function POST(
   const extractedSalary = app.salary ? null : extractSalary(jsonData);
   await supabase
     .from("applications")
-    .update({ resume_json: jsonData, ...(extractedSalary ? { salary: extractedSalary } : {}) })
+    .update({ resume_json: JSON.stringify(jsonData), ...(extractedSalary ? { salary: extractedSalary } : {}) })
     .eq("id", id);
 
   let profileName = "";

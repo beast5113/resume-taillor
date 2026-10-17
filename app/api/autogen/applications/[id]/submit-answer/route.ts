@@ -121,7 +121,7 @@ export async function POST(
         google_drive_link: driveLink,
         error_message: null,
         autogen_claimed_at: null,
-        resume_json: jsonData,
+        resume_json: JSON.stringify(jsonData),
         // Only fills the gap when the application had no salary already.
         ...(app.salary || !extractedSalary ? {} : { salary: extractedSalary }),
       })

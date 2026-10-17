@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
             status: "completed",
             google_drive_link: driveLink,
             google_drive_file_id: fileId,
-            resume_json: resumeJson,
+            resume_json: JSON.stringify(resumeJson),
             // The extension-provided salary (set above, if any) always wins;
             // this only fills the gap when that was null and the job description
             // itself had a figure the model could extract.

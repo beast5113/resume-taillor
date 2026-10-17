@@ -33,8 +33,8 @@ export interface GenerateResult {
    * when it's still unset. */
   salary: string | null;
   /** The raw parsed JSON the model returned (structured or legacy-flat).
-   * Callers tied to a specific `applications` row store this verbatim in its
-   * `resume_json` column, as the record of what the resume was built from. */
+   * Callers tied to a specific `applications` row JSON.stringify this into its
+   * `resume_json` text column, as the record of what the resume was built from. */
   resumeJson: Record<string, unknown>;
 }
 

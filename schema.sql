@@ -972,7 +972,7 @@ CREATE TABLE IF NOT EXISTS "public"."applications" (
     "meeting_done" boolean DEFAULT false NOT NULL,
     "autogen_claimed_at" timestamp with time zone,
     "salary" "text",
-    "resume_json" "jsonb"
+    "resume_json" "text"
 );
 
 
