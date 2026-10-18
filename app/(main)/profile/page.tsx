@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, FileText } from "lucide-react";
+import { Users, FileText, StickyNote } from "lucide-react";
 import { Profile, DocxTemplate } from "@/lib/types";
 
 interface TeamUser { id: string; name: string; email: string; }
@@ -40,6 +40,7 @@ export default function ProfilePage() {
   const [editName, setEditName] = useState("");
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
+  const [editNote, setEditNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -89,6 +90,7 @@ export default function ProfilePage() {
       setEditFirstName(first);
       setEditLastName(last);
     }
+    setEditNote(p.profile_note ?? "");
     setError("");
     loadAssignments(p.id);
   };
@@ -98,6 +100,7 @@ export default function ProfilePage() {
     setEditName("");
     setEditFirstName("");
     setEditLastName("");
+    setEditNote("");
     setError("");
     setAssignments([]);
   };
@@ -115,7 +118,7 @@ export default function ProfilePage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, first_name: editFirstName, last_name: editLastName }),
+      body: JSON.stringify({ name: editName, first_name: editFirstName, last_name: editLastName, profile_note: editNote }),
     });
     if (!res.ok) {
       const { message } = await res.json().catch(() => ({ message: "Save failed" }));
@@ -280,6 +283,21 @@ export default function ProfilePage() {
                   </p>
                 </div>
               )}
+
+              <div>
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <StickyNote size={11} /> Profile Note
+                </p>
+                <textarea
+                  className="field-input text-sm w-full resize-y min-h-28"
+                  placeholder="Basic info about this candidate — contact details, location, work authorization, availability, anything worth keeping on hand…"
+                  value={editNote}
+                  onChange={(e) => setEditNote(e.target.value)}
+                />
+                <p className="text-[11px] text-zinc-600 mt-1.5">
+                  Saved together with the rest of this profile — click {selectedId === "new" ? "Create" : "Save"} above.
+                </p>
+              </div>
 
               {selectedId !== "new" && selectedProfile && (
                 <div>

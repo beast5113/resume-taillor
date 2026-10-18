@@ -26,6 +26,7 @@ export interface Profile {
   first_name: string | null;
   last_name: string | null;
   default_template_id: string | null;
+  profile_note: string | null;
   created_at: string;
   updated_at: string;
 }

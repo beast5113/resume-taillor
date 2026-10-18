@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("profiles")
-    .select("id, name, first_name, last_name, default_template_id, created_at, updated_at")
+    .select("id, name, first_name, last_name, default_template_id, profile_note, created_at, updated_at")
     .order("name", { ascending: true });
 
   if (session.role === "assistant") {
@@ -35,8 +35,9 @@ export async function POST(request: NextRequest) {
   let name: string;
   let first_name: string;
   let last_name: string;
+  let profile_note: string | undefined;
   try {
-    ({ name, first_name, last_name } = await request.json());
+    ({ name, first_name, last_name, profile_note } = await request.json());
   } catch {
     return NextResponse.json({ message: "Invalid request body" }, { status: 400 });
   }
@@ -49,8 +50,8 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("profiles")
-    .insert({ name, first_name, last_name })
-    .select("id, name, first_name, last_name, default_template_id, created_at, updated_at")
+    .insert({ name, first_name, last_name, profile_note: profile_note?.trim() || null })
+    .select("id, name, first_name, last_name, default_template_id, profile_note, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
