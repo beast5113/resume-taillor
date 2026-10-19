@@ -36,7 +36,7 @@ interface Application {
   updated_at: string;
 }
 
-interface Profile  { id: string; name: string; }
+interface Profile  { id: string; name: string; is_active: boolean; }
 interface TeamUser { id: string; name: string; role: string; }
 
 const PAGE_SIZE = 20;
@@ -228,7 +228,9 @@ export default function ApplicationsPage() {
 
   // Load current user + filter option lists once on mount
   useEffect(() => {
-    Promise.all([fetch("/api/me"), fetch("/api/profiles")]).then(async ([meRes, profRes]) => {
+    // includeInactive: this filter needs every profile ever used, including
+    // deactivated ones, so past applications stay filterable by profile.
+    Promise.all([fetch("/api/me"), fetch("/api/profiles?includeInactive=1")]).then(async ([meRes, profRes]) => {
       if (meRes.ok) {
         const me = await meRes.json();
         const admin = me.role === "admin";
@@ -537,12 +539,16 @@ export default function ApplicationsPage() {
                 <Select
                   value={profileId || "_all"}
                   onValueChange={v => { setProfileId(v === "_all" ? "" : (v ?? "")); setPage(1); }}
-                  items={[{ value: "_all", label: "All profiles" }, ...profiles.map(p => ({ value: p.id, label: p.name }))]}
+                  items={[{ value: "_all", label: "All profiles" }, ...profiles.map(p => ({ value: p.id, label: p.is_active ? p.name : `${p.name} (Deactivated)` }))]}
                 >
                   <SelectTrigger className="h-7 text-xs w-auto min-w-24"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_all" className="text-xs">All profiles</SelectItem>
-                    {profiles.map(p => <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>)}
+                    {profiles.map(p => (
+                      <SelectItem key={p.id} value={p.id} className="text-xs">
+                        {p.is_active ? p.name : `${p.name} (Deactivated)`}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1024,7 +1030,7 @@ export default function ApplicationsPage() {
                   <SelectTrigger className="h-9 text-sm w-full"><SelectValue placeholder="Select a profile…" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_none" className="text-xs text-muted-foreground">Select a profile…</SelectItem>
-                    {profiles.map(p => <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>)}
+                    {profiles.filter(p => p.is_active).map(p => <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

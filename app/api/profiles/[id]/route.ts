@@ -8,7 +8,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const update: {
     name?: string; first_name?: string; last_name?: string;
-    default_template_id?: string | null; profile_note?: string | null;
+    default_template_id?: string | null; profile_note?: string | null; is_active?: boolean;
   } = {};
 
   if ("name" in body) {
@@ -28,6 +28,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   if ("profile_note" in body) {
     update.profile_note = String(body.profile_note ?? "").trim() || null;
+  }
+
+  if ("is_active" in body) {
+    update.is_active = Boolean(body.is_active);
   }
 
   if ("default_template_id" in body) {
@@ -56,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .from("profiles")
     .update(update)
     .eq("id", id)
-    .select("id, name, first_name, last_name, default_template_id, profile_note, created_at, updated_at")
+    .select("id, name, first_name, last_name, default_template_id, profile_note, is_active, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });

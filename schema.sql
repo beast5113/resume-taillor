@@ -1033,7 +1033,8 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "default_template_id" "uuid",
     "first_name" "text",
     "last_name" "text",
-    "profile_note" "text"
+    "profile_note" "text",
+    "is_active" boolean DEFAULT true NOT NULL
 );
 
 

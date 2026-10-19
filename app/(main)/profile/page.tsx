@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, FileText, StickyNote } from "lucide-react";
+import { Users, FileText, StickyNote, Power } from "lucide-react";
 import { Profile, DocxTemplate } from "@/lib/types";
 
 interface TeamUser { id: string; name: string; email: string; }
@@ -43,6 +43,7 @@ export default function ProfilePage() {
   const [editNote, setEditNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   // Assigned assistants for the selected profile
   const [allUsers, setAllUsers] = useState<TeamUser[]>([]);
@@ -56,7 +57,7 @@ export default function ProfilePage() {
   const load = useCallback(async () => {
     setLoading(true);
     const [profileRes, userRes, templateRes] = await Promise.all([
-      fetch("/api/profiles"),
+      fetch("/api/profiles?includeInactive=1"),
       fetch("/api/team"),
       fetch("/api/docx-templates"),
     ]);
@@ -139,6 +140,20 @@ export default function ProfilePage() {
     await load();
   };
 
+  const toggleActive = async (p: Profile) => {
+    setTogglingId(p.id);
+    const res = await fetch(`/api/profiles/${p.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: !p.is_active }),
+    });
+    if (res.ok) {
+      const updated: Profile = await res.json();
+      setProfiles((prev) => prev.map((x) => (x.id === p.id ? updated : x)));
+    }
+    setTogglingId(null);
+  };
+
   const setDefaultTemplate = async (profileId: string, templateId: string) => {
     setSavingDefaultTemplate(true);
     const res = await fetch(`/api/profiles/${profileId}`, {
@@ -154,6 +169,8 @@ export default function ProfilePage() {
   };
 
   const selectedProfile = profiles.find((p) => p.id === selectedId);
+  const activeProfiles = profiles.filter((p) => p.is_active);
+  const inactiveProfiles = profiles.filter((p) => !p.is_active);
   const assignedUserIds = new Set(assignments.map((a) => a.user_id));
   const assignedUsers = allUsers.filter((u) => assignedUserIds.has(u.id));
   const profileTemplates = selectedProfile
@@ -176,7 +193,7 @@ export default function ProfilePage() {
           {!loading && profiles.length === 0 && (
             <p className="text-xs text-zinc-500 px-2 py-4 text-center">No profiles yet.</p>
           )}
-          {profiles.map((p) => (
+          {activeProfiles.map((p) => (
             <div
               key={p.id}
               className={`group flex items-center justify-between rounded-lg px-3 py-2.5 cursor-pointer transition-colors ${
@@ -190,15 +207,66 @@ export default function ProfilePage() {
                 </p>
                 <p className="text-[11px] text-zinc-500 mt-0.5">{formatDate(p.created_at)}</p>
               </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteProfile(p.id); }}
-                className="opacity-0 group-hover:opacity-100 btn-ghost text-red-400 hover:text-red-300 hover:bg-red-900/20 flex-shrink-0 ml-1"
-                title="Delete"
-              >
-                <TrashIcon />
-              </button>
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 flex-shrink-0 ml-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleActive(p); }}
+                  disabled={togglingId === p.id}
+                  className="btn-ghost text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                  title="Deactivate"
+                >
+                  <Power size={14} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteProfile(p.id); }}
+                  className="btn-ghost text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                  title="Delete"
+                >
+                  <TrashIcon />
+                </button>
+              </div>
             </div>
           ))}
+
+          {inactiveProfiles.length > 0 && (
+            <>
+              <p className="px-2 pt-3 pb-1 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">
+                Deactivated
+              </p>
+              {inactiveProfiles.map((p) => (
+                <div
+                  key={p.id}
+                  className={`group flex items-center justify-between rounded-lg px-3 py-2.5 cursor-pointer transition-colors opacity-60 ${
+                    selectedId === p.id ? "bg-blue-600/20 border border-blue-600/30" : "hover:bg-zinc-800"
+                  }`}
+                  onClick={() => select(p)}
+                >
+                  <div className="min-w-0">
+                    <p className={`text-sm font-medium truncate ${selectedId === p.id ? "text-blue-300" : "text-zinc-200"}`}>
+                      {p.name}
+                    </p>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">{formatDate(p.created_at)}</p>
+                  </div>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 flex-shrink-0 ml-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleActive(p); }}
+                      disabled={togglingId === p.id}
+                      className="btn-ghost text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800"
+                      title="Activate"
+                    >
+                      <Power size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteProfile(p.id); }}
+                      className="btn-ghost text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                      title="Delete"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -235,12 +303,31 @@ export default function ProfilePage() {
                 <button onClick={save} disabled={saving} className="btn-primary">
                   {saving ? "Saving…" : selectedId === "new" ? "Create" : "Save"}
                 </button>
+                {selectedId !== "new" && selectedProfile && (
+                  <button
+                    onClick={() => toggleActive(selectedProfile)}
+                    disabled={togglingId === selectedProfile.id}
+                    className={`btn-ghost px-3 py-2 ${
+                      selectedProfile.is_active
+                        ? "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                        : "text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800"
+                    }`}
+                    title={selectedProfile.is_active ? "Deactivate profile" : "Activate profile"}
+                  >
+                    <Power size={16} />
+                  </button>
+                )}
                 {selectedId !== "new" && (
                   <button onClick={() => deleteProfile(selectedId)} className="btn-ghost text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-2">
                     <TrashIcon />
                   </button>
                 )}
               </div>
+              {selectedId !== "new" && selectedProfile && !selectedProfile.is_active && (
+                <p className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 bg-zinc-800/60 rounded-full px-2.5 py-1 w-fit">
+                  <Power size={10} /> Deactivated — hidden from extensions and selection lists
+                </p>
+              )}
               <div className="flex items-center gap-3">
                 <input
                   className="field-input text-sm flex-1"

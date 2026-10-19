@@ -62,10 +62,14 @@ export async function POST(request: NextRequest) {
   let profileDefaultTemplateId: string | null = null;
 
   if (profile_id?.trim()) {
+    // A deactivated profile is treated as if it doesn't exist here - same as
+    // an unrecognized id - so a stale extension can't keep filing new
+    // applications against a profile that's been turned off.
     const { data: profile } = await supabase
       .from("profiles")
       .select("id, name, first_name, last_name, default_template_id")
       .eq("id", profile_id.trim())
+      .eq("is_active", true)
       .maybeSingle();
     if (profile) {
       resolvedProfileId = profile.id;

@@ -6,10 +6,19 @@ export async function GET(request: NextRequest) {
   const session = await requireAnyAuth(request);
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
+  // Deactivated profiles are hidden everywhere by default (extension-facing
+  // lookups included, since they go through this same endpoint) - only the
+  // Profile management page and the Applications filter explicitly opt in
+  // with ?includeInactive=1 to show the full set.
+  const includeInactive = request.nextUrl.searchParams.get("includeInactive") === "1";
+
   let query = supabase
     .from("profiles")
-    .select("id, name, first_name, last_name, default_template_id, profile_note, created_at, updated_at")
+    .select("id, name, first_name, last_name, default_template_id, profile_note, is_active, created_at, updated_at")
+    .order("is_active", { ascending: false })
     .order("name", { ascending: true });
+
+  if (!includeInactive) query = query.eq("is_active", true);
 
   if (session.role === "assistant") {
     const { data: assignments } = await supabase
@@ -51,7 +60,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from("profiles")
     .insert({ name, first_name, last_name, profile_note: profile_note?.trim() || null })
-    .select("id, name, first_name, last_name, default_template_id, profile_note, created_at, updated_at")
+    .select("id, name, first_name, last_name, default_template_id, profile_note, is_active, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });

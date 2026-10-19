@@ -28,6 +28,7 @@ export interface Profile {
   last_name: string | null;
   default_template_id: string | null;
   profile_note: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
