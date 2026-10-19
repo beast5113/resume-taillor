@@ -199,6 +199,8 @@ export default function ApplicationsPage() {
   const [bulkUpdating, setBulkUpdating]       = useState(false);
   const [bulkStatusUpdating, setBulkStatusUpdating] = useState(false);
   const [bulkBidderUpdating, setBulkBidderUpdating] = useState(false);
+  const [bulkDeleting, setBulkDeleting]       = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [jdModal, setJdModal] = useState<{ open: boolean; loading: boolean; content: string | null; title: string; role: string }>({
     open: false, loading: false, content: null, title: "", role: "",
   });
@@ -428,6 +430,25 @@ export default function ApplicationsPage() {
     setBulkBidderUpdating(false);
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    const res = await fetch("/api/applications/batch", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (res.ok) {
+      const allOnPageDeleted = applications.every(a => selectedIds.has(a.id));
+      setSelectedIds(new Set());
+      if (allOnPageDeleted && page > 1) setPage(p => p - 1);
+      else setRefreshKey(k => k + 1);
+    }
+    setBulkDeleting(false);
+    setConfirmBulkDelete(false);
+  };
+
   const startEdit = (app: Application) => {
     setEditingId(app.id);
     setEditFields({ company_name: app.company_name, role: app.role });
@@ -654,6 +675,13 @@ export default function ApplicationsPage() {
                     className="size-6 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:pointer-events-none"
                     title="Open selected job URLs in new tabs">
                     <ExternalLink size={12} />
+                  </button>
+                  <button
+                    onClick={() => setConfirmBulkDelete(true)}
+                    disabled={bulkDeleting}
+                    className="size-6 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                    title="Delete selected applications">
+                    <Trash2 size={12} />
                   </button>
                   <button onClick={() => setSelectedIds(new Set())}
                     className="size-6 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Clear selection">
@@ -1134,6 +1162,32 @@ export default function ApplicationsPage() {
               <Button variant="destructive" size="sm" disabled={deletingId === confirmDeleteId}
                 onClick={async () => { if (!confirmDeleteId) return; await handleDelete(confirmDeleteId); }}>
                 {deletingId === confirmDeleteId ? "Deleting…" : "Delete"}
+              </Button>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Bulk delete confirmation */}
+      <Dialog.Root open={confirmBulkDelete} onOpenChange={open => { if (!open && !bulkDeleting) setConfirmBulkDelete(false); }}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 duration-150" />
+          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-sm bg-card rounded-xl ring-1 ring-foreground/10 shadow-xl p-6 space-y-4 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="shrink-0 flex items-center justify-center size-9 rounded-full bg-destructive/10">
+                <AlertTriangle size={16} className="text-destructive" />
+              </div>
+              <div>
+                <Dialog.Title className="text-sm font-semibold text-foreground">Delete {selectedIds.size} application{selectedIds.size === 1 ? "" : "s"}?</Dialog.Title>
+                <Dialog.Description className="text-xs text-muted-foreground mt-1">
+                  This will permanently remove the selected application records (and any uploaded resumes in Drive). This action cannot be undone.
+                </Dialog.Description>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Dialog.Close render={<Button variant="outline" size="sm" disabled={bulkDeleting}>Cancel</Button>} />
+              <Button variant="destructive" size="sm" disabled={bulkDeleting} onClick={handleBulkDelete}>
+                {bulkDeleting ? "Deleting…" : "Delete"}
               </Button>
             </div>
           </Dialog.Popup>

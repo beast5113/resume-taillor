@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
+import { deleteFileFromDrive } from "@/lib/googleDrive";
 import { STATUSES_THAT_CLEAR_RESUME, resumeClearingFields } from "@/lib/applicationResumeCleanup";
 
 const ALLOWED_STATUSES = ["pending", "completed", "failed"];
@@ -40,4 +41,32 @@ export async function PATCH(request: NextRequest) {
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
   return NextResponse.json({ updated: ids.length });
+}
+
+export async function DELETE(request: NextRequest) {
+  const body = await request.json().catch(() => null);
+  const ids = body?.ids;
+
+  if (!Array.isArray(ids) || ids.length === 0)
+    return NextResponse.json({ message: "ids array is required" }, { status: 400 });
+
+  const { data: apps } = await supabase
+    .from("applications")
+    .select("google_drive_file_id")
+    .in("id", ids)
+    .not("google_drive_file_id", "is", null);
+
+  await Promise.all(
+    (apps ?? []).map(async (app) => {
+      try {
+        await deleteFileFromDrive(app.google_drive_file_id as string);
+      } catch {
+        // Drive file may already be gone — continue with DB deletion
+      }
+    })
+  );
+
+  const { error } = await supabase.from("applications").delete().in("id", ids);
+  if (error) return NextResponse.json({ message: error.message }, { status: 500 });
+  return NextResponse.json({ deleted: ids.length });
 }
