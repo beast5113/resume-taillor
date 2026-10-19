@@ -43,7 +43,7 @@ export async function POST(
 
   const { data: tpl, error: tplError } = await supabase
     .from("docx_templates")
-    .select("name, storage_path")
+    .select("name, storage_path, company_name_hyperlink")
     .eq("id", templateId)
     .single();
 
@@ -61,7 +61,9 @@ export async function POST(
 
   let buffer: Buffer;
   if (isStructuredOutput(jsonData)) {
-    const flatData = mapStructuredToFlat(jsonData as unknown as StructuredAIOutput);
+    const flatData = mapStructuredToFlat(jsonData as unknown as StructuredAIOutput, {
+      companyNameHyperlink: tpl.company_name_hyperlink,
+    });
     buffer = renderDocxTemplateStructured(templateBuffer, jsonData as unknown as StructuredAIOutput, flatData);
   } else {
     buffer = renderDocxTemplate(templateBuffer, jsonData as Record<string, string>);

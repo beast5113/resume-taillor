@@ -37,6 +37,7 @@ export default function TemplatesPage() {
   const [uploadProfileId, setUploadProfileId] = useState("");
   const [uploadPromptId, setUploadPromptId] = useState("");
   const [uploadNotes, setUploadNotes] = useState("");
+  const [uploadCompanyNameHyperlink, setUploadCompanyNameHyperlink] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle");
   const [uploadError, setUploadError] = useState("");
@@ -86,6 +87,7 @@ export default function TemplatesPage() {
     if (uploadProfileId) formData.append("profile_id", uploadProfileId);
     if (uploadPromptId) formData.append("prompt_id", uploadPromptId);
     if (uploadNotes.trim()) formData.append("notes", uploadNotes.trim());
+    formData.append("company_name_hyperlink", String(uploadCompanyNameHyperlink));
 
     try {
       const res = await fetch("/api/docx-templates", { method: "POST", body: formData });
@@ -101,6 +103,7 @@ export default function TemplatesPage() {
       setUploadProfileId("");
       setUploadPromptId("");
       setUploadNotes("");
+      setUploadCompanyNameHyperlink(true);
       if (fileInputRef.current) fileInputRef.current.value = "";
       setUploadStatus("success");
     } catch (e) {
@@ -122,6 +125,18 @@ export default function TemplatesPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt_id: promptId || null }),
+    });
+    if (res.ok) {
+      const updated: DocxTemplate = await res.json();
+      setTemplates((prev) => prev.map((t) => (t.id === templateId ? updated : t)));
+    }
+  };
+
+  const handleToggleCompanyNameHyperlink = async (templateId: string, companyNameHyperlink: boolean) => {
+    const res = await fetch(`/api/docx-templates/${templateId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company_name_hyperlink: companyNameHyperlink }),
     });
     if (res.ok) {
       const updated: DocxTemplate = await res.json();
@@ -247,6 +262,23 @@ export default function TemplatesPage() {
                 />
               </div>
 
+              {/* Company name style */}
+              <div>
+                <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-input accent-primary"
+                    checked={uploadCompanyNameHyperlink}
+                    onChange={(e) => setUploadCompanyNameHyperlink(e.target.checked)}
+                  />
+                  Link company name to its website
+                </label>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  When on, {"<<company-name-N>>"} renders as a clickable hyperlink to {"company_website"}.
+                  When off, it renders as plain text and {"company_website"} is ignored.
+                </p>
+              </div>
+
               {/* File drop */}
               <div>
                 <label className="field-label">DOCX File *</label>
@@ -336,7 +368,7 @@ export default function TemplatesPage() {
                           <p className="text-[11px] text-muted-foreground">
                             Uploaded {formatDate(t.created_at)} · ID: {t.id.slice(0, 8)}…
                           </p>
-                          <div className="mt-1.5">
+                          <div className="mt-1.5 flex items-center gap-2 flex-wrap">
                             <select
                               className="field-input text-[11px] py-0.5 w-44"
                               value={t.prompt_id ?? ""}
@@ -348,6 +380,18 @@ export default function TemplatesPage() {
                                 <option key={p.id} value={p.id}>{p.name}</option>
                               ))}
                             </select>
+                            <label
+                              className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none"
+                              title="When on, the company name links to company_website in the generated resume. When off, it's plain text."
+                            >
+                              <input
+                                type="checkbox"
+                                className="size-3.5 rounded border-input accent-primary"
+                                checked={t.company_name_hyperlink}
+                                onChange={(e) => handleToggleCompanyNameHyperlink(t.id, e.target.checked)}
+                              />
+                              Link company name
+                            </label>
                           </div>
                           {t.variables?.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1">

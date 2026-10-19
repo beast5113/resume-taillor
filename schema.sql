@@ -1006,6 +1006,7 @@ CREATE TABLE IF NOT EXISTS "public"."docx_templates" (
     "profile_id" "uuid",
     "prompt_id" "uuid",
     "notes" "text",
+    "company_name_hyperlink" boolean DEFAULT true NOT NULL,
     CONSTRAINT "docx_templates_template_type_check" CHECK (("template_type" = ANY (ARRAY['resume'::"text", 'cover_letter'::"text"])))
 );
 

@@ -52,7 +52,7 @@ export async function generateFromTemplate(
   // Fetch template metadata + file from Supabase
   const { data: tpl, error: tplError } = await supabase
     .from("docx_templates")
-    .select("name, storage_path, variables, notes")
+    .select("name, storage_path, variables, notes, company_name_hyperlink")
     .eq("id", templateId)
     .single();
 
@@ -116,7 +116,7 @@ export async function generateFromTemplate(
 
   if (isStructuredOutput(aiValues)) {
     const structured = aiValues as unknown as StructuredAIOutput;
-    const flatData = mapStructuredToFlat(structured);
+    const flatData = mapStructuredToFlat(structured, { companyNameHyperlink: tpl.company_name_hyperlink });
     buffer = renderDocxTemplateStructured(templateBuffer, structured, flatData);
     nameForFile = tpl.name;
   } else {

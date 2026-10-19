@@ -193,7 +193,20 @@ export function extractSalary(parsed: Record<string, unknown>): string | null {
   return typeof parsed["salary"] === "string" ? parsed["salary"].trim() || null : null;
 }
 
-export function mapStructuredToFlat(structured: StructuredAIOutput): Record<string, string> {
+export interface MapStructuredOptions {
+  /** Whether `company-name-N` is rendered as a real Word hyperlink to
+   * `company_website` (the historical, default behavior) or as plain text
+   * with no underline/link, ignoring `company_website` entirely. Per-template
+   * setting (`docx_templates.company_name_hyperlink`); defaults to `true` so
+   * existing templates keep rendering exactly as before. */
+  companyNameHyperlink?: boolean;
+}
+
+export function mapStructuredToFlat(
+  structured: StructuredAIOutput,
+  options: MapStructuredOptions = {}
+): Record<string, string> {
+  const { companyNameHyperlink = true } = options;
   const flat: Record<string, string> = {};
   if (structured.profile_title) flat["profile-title"] = structured.profile_title;
   if (structured.profile_summary) flat["profile-summary"] = structured.profile_summary;
@@ -209,7 +222,7 @@ export function mapStructuredToFlat(structured: StructuredAIOutput): Record<stri
         : exp.end_client_name;
     }
     if (exp.company_name) {
-      const url = exp.company_website ? sanitizeUrl(exp.company_website) : null;
+      const url = companyNameHyperlink && exp.company_website ? sanitizeUrl(exp.company_website) : null;
       flat[`company-name-${i + 1}`] = url
         ? encodeHyperlinkValue(exp.company_name, url)
         : exp.company_name;

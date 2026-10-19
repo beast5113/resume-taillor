@@ -64,7 +64,7 @@ export async function POST(
 
     const { data: tpl } = await supabase
       .from("docx_templates")
-      .select("name, storage_path")
+      .select("name, storage_path, company_name_hyperlink")
       .eq("id", effectiveTemplateId)
       .maybeSingle();
     if (!tpl) return NextResponse.json({ status: "Error", detail: "Template not found." });
@@ -80,7 +80,8 @@ export async function POST(
     let buffer: Buffer;
     if (isStructuredOutput(jsonData)) {
       const structured = jsonData as unknown as StructuredAIOutput;
-      buffer = renderDocxTemplateStructured(templateBuffer, structured, mapStructuredToFlat(structured));
+      const flatData = mapStructuredToFlat(structured, { companyNameHyperlink: tpl.company_name_hyperlink });
+      buffer = renderDocxTemplateStructured(templateBuffer, structured, flatData);
     } else {
       buffer = renderDocxTemplate(templateBuffer, jsonData as Record<string, string>);
     }

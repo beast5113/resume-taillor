@@ -16,6 +16,7 @@ export interface DocxTemplate {
   profile_id: string | null;
   prompt_id: string | null;
   notes: string | null;
+  company_name_hyperlink: boolean;
   created_at: string;
   updated_at: string;
 }
