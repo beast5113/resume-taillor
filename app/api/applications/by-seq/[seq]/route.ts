@@ -19,11 +19,16 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("applications")
-    .select("*")
+    .select("*, profiles(profile_note)")
     .eq("seq", seqNum)
     .single();
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ message: "Not found" }, { status: 404 });
-  return NextResponse.json(data);
+
+  const { profiles, ...application } = data;
+  return NextResponse.json({
+    ...application,
+    profile_note: (profiles as { profile_note: string | null } | null)?.profile_note ?? null,
+  });
 }
