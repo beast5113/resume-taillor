@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { initExtensionBridge, isExtensionReady, openJobLinks } from "@/lib/extensionBridge";
 
 interface Application {
   id: string;
@@ -100,6 +101,16 @@ function buildPageRange(current: number, total: number): (number | "…")[] {
   return pages;
 }
 
+/** With the extension installed, job links open through it so the tab is tied
+    to this application's seq. Shift/Alt-click keep the browser's default. */
+function handleJobLinkClick(e: ReactMouseEvent<HTMLAnchorElement>, app: Application) {
+  if (!isExtensionReady() || !app.job_url || e.shiftKey || e.altKey) return;
+  if (e.type === "auxclick" && e.button !== 1) return;
+  e.preventDefault();
+  const background = e.type === "auxclick" || e.ctrlKey || e.metaKey;
+  openJobLinks([{ seq: app.seq, url: app.job_url }], !background);
+}
+
 function CopyButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
   const handle = async () => {
@@ -137,6 +148,7 @@ function ActionButtons({ app, deletingId, onOpenJd, onDelete, onUpload }: {
     <div className="flex items-center gap-1.5 flex-nowrap">
       {app.job_url && (
         <a href={app.job_url} target="_blank" rel="noopener noreferrer" title="Open job link"
+          onClick={e => handleJobLinkClick(e, app)} onAuxClick={e => handleJobLinkClick(e, app)}
           className="inline-flex items-center gap-1.5 h-7 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-all">
           <ExternalLink size={12} /><span>Job Link</span>
         </a>
@@ -216,6 +228,8 @@ export default function ApplicationsPage() {
 
   const uploadFileInputRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef(false);
+
+  useEffect(() => initExtensionBridge(), []);
 
   // Debounce search — resets page atomically when it fires
   useEffect(() => {
@@ -667,9 +681,9 @@ export default function ApplicationsPage() {
                   </Select>
                   <button
                     onClick={() => {
-                      applications
+                      openJobLinks(applications
                         .filter(a => selectedIds.has(a.id) && a.job_url)
-                        .forEach(a => window.open(a.job_url!, "_blank", "noopener,noreferrer"));
+                        .map(a => ({ seq: a.seq, url: a.job_url! })));
                     }}
                     disabled={!applications.some(a => selectedIds.has(a.id) && a.job_url)}
                     className="size-6 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:pointer-events-none"
@@ -870,7 +884,8 @@ export default function ApplicationsPage() {
                           <span className="font-semibold text-foreground text-sm truncate">{app.company_name}</span>
                           {isDiceJobUrl(app.job_url) && <DiceBadge />}
                           {app.job_url && (
-                            <a href={app.job_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary shrink-0">
+                            <a href={app.job_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary shrink-0"
+                              onClick={e => handleJobLinkClick(e, app)} onAuxClick={e => handleJobLinkClick(e, app)}>
                               <ExternalLink size={11} />
                             </a>
                           )}

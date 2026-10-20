@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { requireBearerAuth } from "@/lib/auth";
+import { requireBearerAuth, requireSession } from "@/lib/auth";
 
-/** Looked up by the extension's Apply Assistant (keyed by the human-readable
-    seq shown in the UI, not the uuid id) to pull job/resume context for a tab. */
+/** Job/resume context for one application, keyed by the human-readable seq
+    shown in the UI (not the uuid id). Called by the Applications page (session
+    cookie) to hand context to the extension when it opens a job tab, and by
+    the extension's Apply Assistant itself (bearer token) as a fallback. */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ seq: string }> }
 ) {
-  const session = await requireBearerAuth(request);
+  const session = (await requireBearerAuth(request)) ?? (await requireSession());
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const { seq } = await params;
