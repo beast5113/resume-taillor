@@ -224,7 +224,6 @@ export default function ApplicationsPage() {
   });
 
   const uploadFileInputRef = useRef<HTMLInputElement>(null);
-  const pollingRef = useRef(false);
 
   const [extensionReady, setExtensionReady] = useState(false);
   const [checkingExtension, setCheckingExtension] = useState(false);
@@ -245,9 +244,7 @@ export default function ApplicationsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // Clear selection on page navigation only — not on the silent background poll
-  // (refreshKey also bumps every few seconds whenever a row is pending/generating,
-  // which would otherwise wipe the user's checkboxes mid-selection).
+  // Clear selection on page navigation.
   useEffect(() => { setSelectedIds(new Set()); setLastSelectedIndex(null); }, [page]);
 
   // Load current user + filter option lists once on mount
@@ -271,11 +268,8 @@ export default function ApplicationsPage() {
 
   // Main fetch — fires on any filter / page / manual refresh change
   useEffect(() => {
-    const silent = pollingRef.current;
-    pollingRef.current = false;
-
     let active = true;
-    if (!silent) setLoading(true);
+    setLoading(true);
 
     const p = new URLSearchParams({ page: String(page) });
     if (debouncedSearch) p.set("search", debouncedSearch);
@@ -298,13 +292,6 @@ export default function ApplicationsPage() {
 
     return () => { active = false; };
   }, [refreshKey, page, debouncedSearch, searchFullText, profileId, bidderId, statusFilter, stageFilter, date]);
-
-  // Background poll while any app is in-progress (no loading spinner)
-  useEffect(() => {
-    if (!applications.some(a => a.status === "generating" || a.status === "pending")) return;
-    const id = setInterval(() => { pollingRef.current = true; setRefreshKey(k => k + 1); }, 5000);
-    return () => clearInterval(id);
-  }, [applications]);
 
   const resetFilters = () => {
     setSearch(""); setDebouncedSearch(""); setSearchFullText(false); setProfileId(""); setBidderId("");
