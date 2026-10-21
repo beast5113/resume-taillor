@@ -35,6 +35,17 @@ export async function GET(
     // Parsed, not the raw JSON string - callers (the extension) index straight
     // into fields like profile_basic.first_name without parsing it themselves.
     // profile_basic.note is now the only notes field on a profile.
-    profile_basic: profile?.profile_basic ? JSON.parse(profile.profile_basic) : null,
+    profile_basic: parseProfileBasic(profile?.profile_basic),
   });
+}
+
+/** A malformed stored value shouldn't take the whole application context down with it. */
+function parseProfileBasic(value: string | null | undefined): Record<string, unknown> | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
 }

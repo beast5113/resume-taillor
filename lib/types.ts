@@ -53,12 +53,14 @@ export interface ProfileBasicInfo {
   email: string;
   phone: string;
   linkedin: string;
-  University: string;
-  unverstisity_locatoin_city: string;
-  unverstisity_locatoin_state: string;
-  unverstisity_locatoin_state_abb: string;
-  education_start: string;
-  education_end: string;
+  education: {
+    university: string;
+    unverstisity_locatoin_city: string;
+    unverstisity_locatoin_state: string;
+    unverstisity_locatoin_state_abb: string;
+    education_start: string;
+    education_end: string;
+  };
   note: string;
 }
 

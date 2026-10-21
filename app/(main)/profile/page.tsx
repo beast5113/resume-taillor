@@ -17,26 +17,38 @@ function splitLegacyName(name: string): { first: string; last: string } {
   return { first: parts[0] ?? "", last: parts.slice(1).join(" ") };
 }
 
+const EMPTY_EDUCATION: ProfileBasicInfo["education"] = {
+  university: "", unverstisity_locatoin_city: "", unverstisity_locatoin_state: "",
+  unverstisity_locatoin_state_abb: "", education_start: "", education_end: "",
+};
+
 const EMPTY_BASIC_INFO: ProfileBasicInfo = {
   first_name: "", last_name: "", dob: "", address: "", city: "", state: "", state_abb: "", zip: "",
   email: "", phone: "", linkedin: "",
-  University: "", unverstisity_locatoin_city: "", unverstisity_locatoin_state: "", unverstisity_locatoin_state_abb: "",
-  education_start: "", education_end: "", note: "",
+  education: EMPTY_EDUCATION,
+  note: "",
 };
 
 /** Tolerates a null/missing/malformed `profiles.profile_basic` and merges in
  * any fields a stored object might be missing (e.g. saved before a key was
- * added), so the form never crashes on an unexpected shape. */
+ * added), so the form never crashes on an unexpected shape. `education` is
+ * merged one level deep so a partially-filled nested object doesn't wipe out
+ * the other education fields' defaults. */
 function parseBasicInfo(raw: string | null): ProfileBasicInfo {
   if (!raw) return EMPTY_BASIC_INFO;
   try {
-    return { ...EMPTY_BASIC_INFO, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    return {
+      ...EMPTY_BASIC_INFO,
+      ...parsed,
+      education: { ...EMPTY_EDUCATION, ...(parsed?.education ?? {}) },
+    };
   } catch {
     return EMPTY_BASIC_INFO;
   }
 }
 
-const BASIC_INFO_FIELDS: { key: keyof ProfileBasicInfo; label: string; placeholder?: string }[] = [
+const BASIC_INFO_FIELDS: { key: keyof Omit<ProfileBasicInfo, "education" | "note">; label: string; placeholder?: string }[] = [
   { key: "first_name", label: "First Name" },
   { key: "last_name", label: "Last Name" },
   { key: "dob", label: "Date of Birth", placeholder: "YYYY-MM" },
@@ -50,8 +62,8 @@ const BASIC_INFO_FIELDS: { key: keyof ProfileBasicInfo; label: string; placehold
   { key: "zip", label: "Zip Code" },
 ];
 
-const EDUCATION_FIELDS: { key: keyof ProfileBasicInfo; label: string; placeholder?: string }[] = [
-  { key: "University", label: "University" },
+const EDUCATION_FIELDS: { key: keyof ProfileBasicInfo["education"]; label: string; placeholder?: string }[] = [
+  { key: "university", label: "University" },
   { key: "unverstisity_locatoin_city", label: "University City" },
   { key: "unverstisity_locatoin_state", label: "University State" },
   { key: "unverstisity_locatoin_state_abb", label: "University State Abbreviation", placeholder: "e.g. TX" },
@@ -148,8 +160,11 @@ export default function ProfilePage() {
     setAssignments([]);
   };
 
-  const updateBasic = (key: keyof ProfileBasicInfo, value: string) =>
+  const updateBasic = (key: keyof Omit<ProfileBasicInfo, "education">, value: string) =>
     setEditBasic((prev) => ({ ...prev, [key]: value }));
+
+  const updateEducation = (key: keyof ProfileBasicInfo["education"], value: string) =>
+    setEditBasic((prev) => ({ ...prev, education: { ...prev.education, [key]: value } }));
 
   const save = async () => {
     if (!editName.trim() || !editFirstName.trim() || !editLastName.trim()) {
@@ -445,8 +460,8 @@ export default function ProfilePage() {
                       <input
                         className="field-input text-sm w-full"
                         placeholder={f.placeholder}
-                        value={editBasic[f.key]}
-                        onChange={(e) => updateBasic(f.key, e.target.value)}
+                        value={editBasic.education[f.key]}
+                        onChange={(e) => updateEducation(f.key, e.target.value)}
                       />
                     </div>
                   ))}
