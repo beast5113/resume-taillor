@@ -21,7 +21,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("applications")
-    .select("*, profiles(profile_note)")
+    .select("*, profiles(profile_basic)")
     .eq("seq", seqNum)
     .single();
 
@@ -29,8 +29,12 @@ export async function GET(
   if (!data) return NextResponse.json({ message: "Not found" }, { status: 404 });
 
   const { profiles, ...application } = data;
+  const profile = profiles as { profile_basic: string | null } | null;
   return NextResponse.json({
     ...application,
-    profile_note: (profiles as { profile_note: string | null } | null)?.profile_note ?? null,
+    // Parsed, not the raw JSON string - callers (the extension) index straight
+    // into fields like profile_basic.first_name without parsing it themselves.
+    // profile_basic.note is now the only notes field on a profile.
+    profile_basic: profile?.profile_basic ? JSON.parse(profile.profile_basic) : null,
   });
 }

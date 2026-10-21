@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, FileText, StickyNote, Power } from "lucide-react";
-import { Profile, DocxTemplate } from "@/lib/types";
+import { Users, FileText, Power, Contact } from "lucide-react";
+import { Profile, ProfileBasicInfo, DocxTemplate } from "@/lib/types";
 
 interface TeamUser { id: string; name: string; email: string; }
 interface Assignment { id: string; profile_id: string; user_id: string; }
@@ -16,6 +16,48 @@ function splitLegacyName(name: string): { first: string; last: string } {
   const parts = name.trim().split(/\s+/);
   return { first: parts[0] ?? "", last: parts.slice(1).join(" ") };
 }
+
+const EMPTY_BASIC_INFO: ProfileBasicInfo = {
+  first_name: "", last_name: "", dob: "", address: "", city: "", state: "", state_abb: "", zip: "",
+  email: "", phone: "", linkedin: "",
+  University: "", unverstisity_locatoin_city: "", unverstisity_locatoin_state: "", unverstisity_locatoin_state_abb: "",
+  education_start: "", education_end: "", note: "",
+};
+
+/** Tolerates a null/missing/malformed `profiles.profile_basic` and merges in
+ * any fields a stored object might be missing (e.g. saved before a key was
+ * added), so the form never crashes on an unexpected shape. */
+function parseBasicInfo(raw: string | null): ProfileBasicInfo {
+  if (!raw) return EMPTY_BASIC_INFO;
+  try {
+    return { ...EMPTY_BASIC_INFO, ...JSON.parse(raw) };
+  } catch {
+    return EMPTY_BASIC_INFO;
+  }
+}
+
+const BASIC_INFO_FIELDS: { key: keyof ProfileBasicInfo; label: string; placeholder?: string }[] = [
+  { key: "first_name", label: "First Name" },
+  { key: "last_name", label: "Last Name" },
+  { key: "dob", label: "Date of Birth", placeholder: "YYYY-MM" },
+  { key: "email", label: "Email" },
+  { key: "phone", label: "Phone", placeholder: "(XXX) XXX-XXXX" },
+  { key: "linkedin", label: "LinkedIn (Optional)" },
+  { key: "address", label: "Address" },
+  { key: "city", label: "City" },
+  { key: "state", label: "State" },
+  { key: "state_abb", label: "State Abbreviation", placeholder: "e.g. TX" },
+  { key: "zip", label: "Zip Code" },
+];
+
+const EDUCATION_FIELDS: { key: keyof ProfileBasicInfo; label: string; placeholder?: string }[] = [
+  { key: "University", label: "University" },
+  { key: "unverstisity_locatoin_city", label: "University City" },
+  { key: "unverstisity_locatoin_state", label: "University State" },
+  { key: "unverstisity_locatoin_state_abb", label: "University State Abbreviation", placeholder: "e.g. TX" },
+  { key: "education_start", label: "Education Start", placeholder: "YYYY-MM" },
+  { key: "education_end", label: "Education End", placeholder: "YYYY-MM" },
+];
 
 function PlusIcon() {
   return (
@@ -40,7 +82,7 @@ export default function ProfilePage() {
   const [editName, setEditName] = useState("");
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
-  const [editNote, setEditNote] = useState("");
+  const [editBasic, setEditBasic] = useState<ProfileBasicInfo>(EMPTY_BASIC_INFO);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -91,7 +133,7 @@ export default function ProfilePage() {
       setEditFirstName(first);
       setEditLastName(last);
     }
-    setEditNote(p.profile_note ?? "");
+    setEditBasic(parseBasicInfo(p.profile_basic));
     setError("");
     loadAssignments(p.id);
   };
@@ -101,10 +143,13 @@ export default function ProfilePage() {
     setEditName("");
     setEditFirstName("");
     setEditLastName("");
-    setEditNote("");
+    setEditBasic(EMPTY_BASIC_INFO);
     setError("");
     setAssignments([]);
   };
+
+  const updateBasic = (key: keyof ProfileBasicInfo, value: string) =>
+    setEditBasic((prev) => ({ ...prev, [key]: value }));
 
   const save = async () => {
     if (!editName.trim() || !editFirstName.trim() || !editLastName.trim()) {
@@ -119,7 +164,10 @@ export default function ProfilePage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, first_name: editFirstName, last_name: editLastName, profile_note: editNote }),
+      body: JSON.stringify({
+        name: editName, first_name: editFirstName, last_name: editLastName,
+        profile_basic: JSON.stringify(editBasic),
+      }),
     });
     if (!res.ok) {
       const { message } = await res.json().catch(() => ({ message: "Save failed" }));
@@ -372,16 +420,47 @@ export default function ProfilePage() {
               )}
 
               <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <StickyNote size={11} /> Profile Note
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Contact size={11} /> Profile Basic Info
                 </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {BASIC_INFO_FIELDS.map((f) => (
+                    <div key={f.key}>
+                      <label className="text-[11px] text-zinc-500 block mb-1">{f.label}</label>
+                      <input
+                        className="field-input text-sm w-full"
+                        placeholder={f.placeholder}
+                        value={editBasic[f.key]}
+                        onChange={(e) => updateBasic(f.key, e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-zinc-500 uppercase tracking-wider mt-4 mb-2">Education</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {EDUCATION_FIELDS.map((f) => (
+                    <div key={f.key}>
+                      <label className="text-[11px] text-zinc-500 block mb-1">{f.label}</label>
+                      <input
+                        className="field-input text-sm w-full"
+                        placeholder={f.placeholder}
+                        value={editBasic[f.key]}
+                        onChange={(e) => updateBasic(f.key, e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <label className="text-[11px] text-zinc-500 block mt-4 mb-1">Note</label>
                 <textarea
                   className="field-input text-sm w-full resize-y min-h-28"
-                  placeholder="Basic info about this candidate — contact details, location, work authorization, availability, anything worth keeping on hand…"
-                  value={editNote}
-                  onChange={(e) => setEditNote(e.target.value)}
+                  placeholder="Work authorization, visa status, EEO/demographic questions, availability, anything else worth keeping on hand…"
+                  value={editBasic.note}
+                  onChange={(e) => updateBasic("note", e.target.value)}
                 />
-                <p className="text-[11px] text-zinc-600 mt-1.5">
+
+                <p className="text-[11px] text-zinc-600 mt-2">
                   Saved together with the rest of this profile — click {selectedId === "new" ? "Create" : "Save"} above.
                 </p>
               </div>

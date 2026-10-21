@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("profiles")
-    .select("id, name, first_name, last_name, default_template_id, profile_note, is_active, created_at, updated_at")
+    .select("id, name, first_name, last_name, default_template_id, profile_basic, is_active, created_at, updated_at")
     .order("is_active", { ascending: false })
     .order("name", { ascending: true });
 
@@ -44,9 +44,9 @@ export async function POST(request: NextRequest) {
   let name: string;
   let first_name: string;
   let last_name: string;
-  let profile_note: string | undefined;
+  let profile_basic: string | undefined;
   try {
-    ({ name, first_name, last_name, profile_note } = await request.json());
+    ({ name, first_name, last_name, profile_basic } = await request.json());
   } catch {
     return NextResponse.json({ message: "Invalid request body" }, { status: 400 });
   }
@@ -57,10 +57,21 @@ export async function POST(request: NextRequest) {
   if (!name || !first_name || !last_name)
     return NextResponse.json({ message: "name, first_name, and last_name are required" }, { status: 400 });
 
+  if (profile_basic?.trim()) {
+    try {
+      JSON.parse(profile_basic);
+    } catch {
+      return NextResponse.json({ message: "profile_basic must be valid JSON" }, { status: 400 });
+    }
+  }
+
   const { data, error } = await supabase
     .from("profiles")
-    .insert({ name, first_name, last_name, profile_note: profile_note?.trim() || null })
-    .select("id, name, first_name, last_name, default_template_id, profile_note, is_active, created_at, updated_at")
+    .insert({
+      name, first_name, last_name,
+      profile_basic: profile_basic?.trim() || null,
+    })
+    .select("id, name, first_name, last_name, default_template_id, profile_basic, is_active, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });

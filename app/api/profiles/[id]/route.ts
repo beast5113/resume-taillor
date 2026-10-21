@@ -8,7 +8,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const update: {
     name?: string; first_name?: string; last_name?: string;
-    default_template_id?: string | null; profile_note?: string | null; is_active?: boolean;
+    default_template_id?: string | null;
+    profile_basic?: string | null; is_active?: boolean;
   } = {};
 
   if ("name" in body) {
@@ -26,8 +27,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     update.last_name = last_name;
   }
 
-  if ("profile_note" in body) {
-    update.profile_note = String(body.profile_note ?? "").trim() || null;
+  if ("profile_basic" in body) {
+    const profile_basic = String(body.profile_basic ?? "").trim() || null;
+    if (profile_basic) {
+      try {
+        JSON.parse(profile_basic);
+      } catch {
+        return NextResponse.json({ message: "profile_basic must be valid JSON" }, { status: 400 });
+      }
+    }
+    update.profile_basic = profile_basic;
   }
 
   if ("is_active" in body) {
@@ -60,7 +69,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .from("profiles")
     .update(update)
     .eq("id", id)
-    .select("id, name, first_name, last_name, default_template_id, profile_note, is_active, created_at, updated_at")
+    .select("id, name, first_name, last_name, default_template_id, profile_basic, is_active, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });

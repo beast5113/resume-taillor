@@ -27,10 +27,39 @@ export interface Profile {
   first_name: string | null;
   last_name: string | null;
   default_template_id: string | null;
-  profile_note: string | null;
+  /** JSON.stringify'd `ProfileBasicInfo`, or null if never filled in. */
+  profile_basic: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** The structured "basic info" form on the Profile page - personal/education
+ * details used for auto-fill (e.g. by the Apply Assistant extension), plus a
+ * freeform `note` sub-field for anything else (work auth, EEO questions,
+ * etc.) - this is the only notes field on a profile now; there is no separate
+ * `profile_note` column. Stored as JSON text in `profiles.profile_basic`;
+ * key names/casing are a fixed external contract, not just internal naming -
+ * keep them exactly as-is if touching this. */
+export interface ProfileBasicInfo {
+  first_name: string;
+  last_name: string;
+  dob: string;
+  address: string;
+  city: string;
+  state: string;
+  state_abb: string;
+  zip: string;
+  email: string;
+  phone: string;
+  linkedin: string;
+  University: string;
+  unverstisity_locatoin_city: string;
+  unverstisity_locatoin_state: string;
+  unverstisity_locatoin_state_abb: string;
+  education_start: string;
+  education_end: string;
+  note: string;
 }
 
 export interface ProfileAssignment {
