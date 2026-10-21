@@ -57,5 +57,54 @@ export async function GET() {
   const diceCounts = Array.from(diceMap.entries()).map(([date, count]) => ({ date, count }));
   const otherCounts = Array.from(otherMap.entries()).map(([date, count]) => ({ date, count }));
 
-  return NextResponse.json({ diceCounts, otherCounts });
+  // Per-profile "saved" vs "applied" pipeline-stage counts, across ALL
+  // applications (not just this week). "saved" is every application's default
+  // pipeline_status, so that bucket alone can exceed PostgREST's 1000-row page
+  // size - paginate through it explicitly rather than silently truncating.
+  const STAGE_STATUSES = ["saved", "applied"] as const;
+  const stageCounts = new Map<string, { saved: number; applied: number }>();
+  {
+    const PAGE_SIZE = 1000;
+    let from = 0;
+    for (;;) {
+      const { data: rows, error: stageError } = await supabase
+        .from("applications")
+        .select("profile_id, pipeline_status")
+        .in("pipeline_status", STAGE_STATUSES)
+        .not("profile_id", "is", null)
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (stageError) return NextResponse.json({ message: stageError.message }, { status: 500 });
+      if (!rows || rows.length === 0) break;
+
+      for (const row of rows) {
+        const profileId = row.profile_id as string;
+        const entry = stageCounts.get(profileId) ?? { saved: 0, applied: 0 };
+        if (row.pipeline_status === "saved") entry.saved += 1;
+        else if (row.pipeline_status === "applied") entry.applied += 1;
+        stageCounts.set(profileId, entry);
+      }
+
+      if (rows.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+  }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, name, is_active");
+
+  if (profilesError) return NextResponse.json({ message: profilesError.message }, { status: 500 });
+
+  const profileStageCounts = (profiles ?? [])
+    .map((p) => ({
+      id: p.id as string,
+      name: p.name as string,
+      is_active: p.is_active as boolean,
+      saved: stageCounts.get(p.id as string)?.saved ?? 0,
+      applied: stageCounts.get(p.id as string)?.applied ?? 0,
+    }))
+    .sort((a, b) => (b.saved + b.applied) - (a.saved + a.applied) || a.name.localeCompare(b.name));
+
+  return NextResponse.json({ diceCounts, otherCounts, profileStageCounts });
 }

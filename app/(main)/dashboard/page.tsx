@@ -3,9 +3,70 @@
 import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
+interface ProfileStageCount {
+  id: string;
+  name: string;
+  is_active: boolean;
+  saved: number;
+  applied: number;
+}
+
 interface DashboardData {
   diceCounts: { date: string; count: number }[];
   otherCounts: { date: string; count: number }[];
+  profileStageCounts: ProfileStageCount[];
+}
+
+function ProfileStageTable({ rows }: { rows: ProfileStageCount[] }) {
+  const totalSaved = rows.reduce((sum, r) => sum + r.saved, 0);
+  const totalApplied = rows.reduce((sum, r) => sum + r.applied, 0);
+
+  return (
+    <div className="section-card space-y-3">
+      <h2 className="text-sm font-semibold text-foreground">Applications by Profile — Saved vs Applied</h2>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Profile</th>
+              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Saved</th>
+              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Applied</th>
+              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Total</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-3 py-6 text-center text-xs text-muted-foreground">No profiles yet.</td>
+              </tr>
+            ) : (
+              rows.map((r) => (
+                <tr key={r.id} className={r.is_active ? "" : "opacity-50"}>
+                  <td className="px-3 py-2 text-foreground whitespace-nowrap">
+                    {r.name}
+                    {!r.is_active && <span className="ml-1.5 text-[10px] text-muted-foreground">(Deactivated)</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-foreground">{r.saved}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-foreground">{r.applied}</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-medium text-foreground">{r.saved + r.applied}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          {rows.length > 0 && (
+            <tfoot>
+              <tr className="border-t border-border font-medium">
+                <td className="px-3 py-2 text-foreground">Total</td>
+                <td className="px-3 py-2 text-right tabular-nums text-foreground">{totalSaved}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-foreground">{totalApplied}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-foreground">{totalSaved + totalApplied}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
 }
 
 function DailyBidChart({ title, data, color }: { title: string; data: { date: string; count: number }[]; color: string }) {
@@ -66,6 +127,8 @@ export default function DashboardPage() {
           <DailyBidChart title="Dice Bid Count — This Week" data={data.diceCounts} color="oklch(0.577 0.245 27.325)" />
           <DailyBidChart title="Other Bid Count — This Week" data={data.otherCounts} color="oklch(0.488 0.243 264.376)" />
         </div>
+
+        <ProfileStageTable rows={data.profileStageCounts} />
       </div>
     </div>
   );
