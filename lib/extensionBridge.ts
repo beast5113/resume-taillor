@@ -56,17 +56,21 @@ function request(type: string, body: Record<string, unknown>, timeoutMs: number)
   });
 }
 
-function pingOnce() {
-  void request("RTA_PING", {}, 1500).then((result) => setReady(!!result?.ok));
+function pingOnce(): Promise<boolean> {
+  return request("RTA_PING", {}, 1500).then((result) => {
+    const ok = !!result?.ok;
+    setReady(ok);
+    return ok;
+  });
 }
 
 /** Starts listening and checks whether the extension is present. Returns a cleanup for useEffect. */
 export function initExtensionBridge(): () => void {
   if (listeners++ === 0) {
     window.addEventListener("message", onMessage);
-    pingTimer = window.setInterval(pingOnce, PING_INTERVAL_MS);
+    pingTimer = window.setInterval(() => void pingOnce(), PING_INTERVAL_MS);
   }
-  pingOnce();
+  void pingOnce();
   return () => {
     if (--listeners === 0) {
       window.removeEventListener("message", onMessage);
@@ -77,6 +81,14 @@ export function initExtensionBridge(): () => void {
 
 export function isExtensionReady(): boolean {
   return ready;
+}
+
+/** Forces an immediate re-check instead of waiting for the next periodic ping
+    (e.g. a manual "recheck" button next to a status badge) - the extension's
+    content script can go silently orphaned on reload (see assistant/bridge.js),
+    so this gives a user a way to confirm reconnection right away. */
+export function recheckExtension(): Promise<boolean> {
+  return pingOnce();
 }
 
 /** Subscribes to extension-ready changes (e.g. to drive a status badge),

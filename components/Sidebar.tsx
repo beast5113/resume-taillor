@@ -43,12 +43,12 @@ export default function Sidebar({ role, userName }: SidebarProps) {
   return (
     <aside className="w-44 shrink-0 bg-sidebar flex flex-col border-r border-sidebar-border">
       {/* Brand */}
-      <div className="px-4 py-5 border-b border-sidebar-border flex items-center gap-2.5">
+      <div className="px-4 py-4 border-sidebar-border flex items-center gap-2.5">
         <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center shrink-0">
           <Zap size={14} className="text-primary-foreground" strokeWidth={2.5} />
         </div>
         <span className="text-sm font-semibold text-sidebar-foreground leading-tight">
-          AI Resume<br />Tailor
+          LimitlessTech
         </span>
       </div>
 
