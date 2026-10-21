@@ -76,12 +76,15 @@ function openInBrowser(jobs: JobToOpen[]) {
 }
 
 /** Opens job links — through the extension when it's installed, otherwise as plain tabs.
-    `active` focuses the first new tab; omitted, only a single job is focused. */
-export function openJobLinks(jobs: JobToOpen[], active?: boolean) {
+    `active` focuses the first new tab; omitted, only a single job is focused.
+    Returns a promise so callers can show a loading state for the (up to a few
+    seconds) extension round-trip instead of leaving the click looking inert. */
+export async function openJobLinks(jobs: JobToOpen[], active?: boolean): Promise<void> {
   if (!jobs.length) return;
   if (!ready) {
     openInBrowser(jobs);
     return;
   }
-  void openWithExtension(jobs, active).then((ok) => { if (!ok) openInBrowser(jobs); });
+  const ok = await openWithExtension(jobs, active);
+  if (!ok) openInBrowser(jobs);
 }

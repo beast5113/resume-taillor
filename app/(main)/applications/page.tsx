@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 
 import {
   RefreshCw, Download, ExternalLink, Trash2, Inbox,
   Search, ChevronLeft, ChevronRight, Copy, Check,
-  AlertTriangle, FileText, X, Pencil, Upload, UploadCloud, DollarSign,
+  AlertTriangle, FileText, X, Pencil, Upload, UploadCloud, DollarSign, Loader2,
 } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Tooltip } from "@base-ui/react/tooltip";
@@ -101,16 +101,6 @@ function buildPageRange(current: number, total: number): (number | "…")[] {
   return pages;
 }
 
-/** With the extension installed, job links open through it so the tab is tied
-    to this application's seq. Shift/Alt-click keep the browser's default. */
-function handleJobLinkClick(e: ReactMouseEvent<HTMLAnchorElement>, app: Application) {
-  if (!isExtensionReady() || !app.job_url || e.shiftKey || e.altKey) return;
-  if (e.type === "auxclick" && e.button !== 1) return;
-  e.preventDefault();
-  const background = e.type === "auxclick" || e.ctrlKey || e.metaKey;
-  openJobLinks([{ seq: app.seq, url: app.job_url }], !background);
-}
-
 function CopyButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
   const handle = async () => {
@@ -138,19 +128,24 @@ function CopyButton({ url }: { url: string }) {
   );
 }
 
-function ActionButtons({ app, deletingId, onOpenJd, onDelete, onUpload }: {
+function ActionButtons({ app, deletingId, onOpenJd, onDelete, onUpload, openingJobIds, onOpenJobLink }: {
   app: Application; deletingId: string | null;
   onOpenJd: (app: Application) => void;
   onDelete: (id: string) => void;
   onUpload: (app: Application) => void;
+  openingJobIds: Set<string>;
+  onOpenJobLink: (e: ReactMouseEvent<HTMLAnchorElement>, app: Application) => void;
 }) {
+  const opening = openingJobIds.has(app.id);
   return (
     <div className="flex items-center gap-1.5 flex-nowrap">
       {app.job_url && (
         <a href={app.job_url} target="_blank" rel="noopener noreferrer" title="Open job link"
-          onClick={e => handleJobLinkClick(e, app)} onAuxClick={e => handleJobLinkClick(e, app)}
-          className="inline-flex items-center gap-1.5 h-7 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-all">
-          <ExternalLink size={12} /><span>Job Link</span>
+          onClick={e => onOpenJobLink(e, app)} onAuxClick={e => onOpenJobLink(e, app)}
+          aria-disabled={opening}
+          className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-all ${opening ? "opacity-60 pointer-events-none" : ""}`}>
+          {opening ? <Loader2 size={12} className="animate-spin" /> : <ExternalLink size={12} />}
+          <span>{opening ? "Opening…" : "Link"}</span>
         </a>
       )}
       {app.status === "pending" && (
@@ -213,6 +208,8 @@ export default function ApplicationsPage() {
   const [bulkBidderUpdating, setBulkBidderUpdating] = useState(false);
   const [bulkDeleting, setBulkDeleting]       = useState(false);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [openingJobIds, setOpeningJobIds]     = useState<Set<string>>(new Set());
+  const [bulkOpening, setBulkOpening]         = useState(false);
   const [jdModal, setJdModal] = useState<{ open: boolean; loading: boolean; content: string | null; title: string; role: string }>({
     open: false, loading: false, content: null, title: "", role: "",
   });
@@ -314,6 +311,43 @@ export default function ApplicationsPage() {
     setConfirmDeleteId(null);
     if (applications.length === 1 && page > 1) setPage(p => p - 1);
     else setRefreshKey(k => k + 1);
+  };
+
+  /** With the extension installed, job links open through it so the tab is tied
+      to this application's seq — that round-trip (open a tab + send it context)
+      can take a couple seconds, so the button shows a spinner meanwhile instead
+      of looking unresponsive. Shift/Alt-click keep the browser's default. */
+  const handleOpenJobLink = async (e: ReactMouseEvent<HTMLAnchorElement>, app: Application) => {
+    if (openingJobIds.has(app.id)) { e.preventDefault(); return; }
+    if (!isExtensionReady() || !app.job_url || e.shiftKey || e.altKey) return;
+    if (e.type === "auxclick" && e.button !== 1) return;
+    e.preventDefault();
+    const background = e.type === "auxclick" || e.ctrlKey || e.metaKey;
+    setOpeningJobIds(prev => new Set(prev).add(app.id));
+    try {
+      await openJobLinks([{ seq: app.seq, url: app.job_url }], !background);
+    } finally {
+      setOpeningJobIds(prev => { const next = new Set(prev); next.delete(app.id); return next; });
+    }
+  };
+
+  const handleBulkOpenJobLinks = async () => {
+    const jobs = applications
+      .filter(a => selectedIds.has(a.id) && a.job_url)
+      .map(a => ({ seq: a.seq, url: a.job_url! }));
+    if (!jobs.length || bulkOpening) return;
+    setBulkOpening(true);
+    try {
+      await openJobLinks(jobs);
+    } finally {
+      setBulkOpening(false);
+    }
+  };
+
+  const handleBulkDownload = () => {
+    applications
+      .filter(a => selectedIds.has(a.id) && a.status === "completed" && a.google_drive_file_id)
+      .forEach(a => window.open(`https://drive.google.com/uc?export=download&id=${a.google_drive_file_id}`, "_blank", "noopener,noreferrer"));
   };
 
   const openJd = async (app: Application) => {
@@ -680,15 +714,18 @@ export default function ApplicationsPage() {
                     </SelectContent>
                   </Select>
                   <button
-                    onClick={() => {
-                      openJobLinks(applications
-                        .filter(a => selectedIds.has(a.id) && a.job_url)
-                        .map(a => ({ seq: a.seq, url: a.job_url! })));
-                    }}
-                    disabled={!applications.some(a => selectedIds.has(a.id) && a.job_url)}
+                    onClick={() => void handleBulkOpenJobLinks()}
+                    disabled={bulkOpening || !applications.some(a => selectedIds.has(a.id) && a.job_url)}
                     className="size-6 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:pointer-events-none"
                     title="Open selected job URLs in new tabs">
-                    <ExternalLink size={12} />
+                    {bulkOpening ? <Loader2 size={12} className="animate-spin" /> : <ExternalLink size={12} />}
+                  </button>
+                  <button
+                    onClick={handleBulkDownload}
+                    disabled={!applications.some(a => selectedIds.has(a.id) && a.status === "completed" && a.google_drive_file_id)}
+                    className="size-6 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                    title="Download selected resumes">
+                    <Download size={12} />
                   </button>
                   <button
                     onClick={() => setConfirmBulkDelete(true)}
@@ -860,7 +897,7 @@ export default function ApplicationsPage() {
                                 </button>
                               </>
                             ) : (
-                              <ActionButtons app={app} deletingId={deletingId} onOpenJd={openJd} onDelete={id => setConfirmDeleteId(id)} onUpload={openUpload} />
+                              <ActionButtons app={app} deletingId={deletingId} onOpenJd={openJd} onDelete={id => setConfirmDeleteId(id)} onUpload={openUpload} openingJobIds={openingJobIds} onOpenJobLink={handleOpenJobLink} />
                             )}
                           </div>
                         </td>
@@ -884,9 +921,10 @@ export default function ApplicationsPage() {
                           <span className="font-semibold text-foreground text-sm truncate">{app.company_name}</span>
                           {isDiceJobUrl(app.job_url) && <DiceBadge />}
                           {app.job_url && (
-                            <a href={app.job_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary shrink-0"
-                              onClick={e => handleJobLinkClick(e, app)} onAuxClick={e => handleJobLinkClick(e, app)}>
-                              <ExternalLink size={11} />
+                            <a href={app.job_url} target="_blank" rel="noopener noreferrer"
+                              className={`text-muted-foreground hover:text-primary shrink-0 ${openingJobIds.has(app.id) ? "opacity-60 pointer-events-none" : ""}`}
+                              onClick={e => handleOpenJobLink(e, app)} onAuxClick={e => handleOpenJobLink(e, app)}>
+                              {openingJobIds.has(app.id) ? <Loader2 size={11} className="animate-spin" /> : <ExternalLink size={11} />}
                             </a>
                           )}
                         </div>
@@ -912,7 +950,7 @@ export default function ApplicationsPage() {
                       <span className="text-xs text-muted-foreground shrink-0">{formatDate(app.created_at)}</span>
                     </div>
                     <div className="pt-1 border-t border-border flex items-center justify-between gap-2">
-                      <ActionButtons app={app} deletingId={deletingId} onOpenJd={openJd} onDelete={id => setConfirmDeleteId(id)} onUpload={openUpload} />
+                      <ActionButtons app={app} deletingId={deletingId} onOpenJd={openJd} onDelete={id => setConfirmDeleteId(id)} onUpload={openUpload} openingJobIds={openingJobIds} onOpenJobLink={handleOpenJobLink} />
                       <div className="flex items-center gap-1 shrink-0">
                         <button onClick={() => openSalary(app)} title={app.salary ?? "Add salary"}
                           className={`inline-flex items-center gap-1 h-7 px-2 rounded-lg border border-input bg-transparent text-xs transition-all max-w-24 ${app.salary ? "text-emerald-400 hover:bg-accent" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}>
