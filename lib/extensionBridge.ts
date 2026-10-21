@@ -14,7 +14,22 @@ export interface JobToOpen { seq: number; url: string }
 let ready = false;
 let listeners = 0;
 let nextRequestId = 0;
+let pingTimer: number | null = null;
 const waiting = new Map<string, (result: ExtensionResult) => void>();
+const readyListeners = new Set<(ready: boolean) => void>();
+
+// Re-pinged on this cadence (while at least one page is listening) rather than
+// just once on mount, so a UI indicator reflects reality live - e.g. right
+// after the extension reloads and re-injects its connector into this tab
+// (see assistant/bridge.js's onInstalled handler), without needing a page
+// refresh to notice.
+const PING_INTERVAL_MS = 10000;
+
+function setReady(value: boolean) {
+  if (value === ready) return;
+  ready = value;
+  readyListeners.forEach((cb) => cb(ready));
+}
 
 function onMessage(event: MessageEvent) {
   if (event.source !== window) return;
@@ -41,17 +56,35 @@ function request(type: string, body: Record<string, unknown>, timeoutMs: number)
   });
 }
 
+function pingOnce() {
+  void request("RTA_PING", {}, 1500).then((result) => setReady(!!result?.ok));
+}
+
 /** Starts listening and checks whether the extension is present. Returns a cleanup for useEffect. */
 export function initExtensionBridge(): () => void {
-  if (listeners++ === 0) window.addEventListener("message", onMessage);
-  void request("RTA_PING", {}, 1500).then((result) => { ready = !!result?.ok; });
+  if (listeners++ === 0) {
+    window.addEventListener("message", onMessage);
+    pingTimer = window.setInterval(pingOnce, PING_INTERVAL_MS);
+  }
+  pingOnce();
   return () => {
-    if (--listeners === 0) window.removeEventListener("message", onMessage);
+    if (--listeners === 0) {
+      window.removeEventListener("message", onMessage);
+      if (pingTimer != null) { window.clearInterval(pingTimer); pingTimer = null; }
+    }
   };
 }
 
 export function isExtensionReady(): boolean {
   return ready;
+}
+
+/** Subscribes to extension-ready changes (e.g. to drive a status badge),
+    calling back immediately with the current state. Returns an unsubscribe. */
+export function onExtensionReadyChange(cb: (ready: boolean) => void): () => void {
+  readyListeners.add(cb);
+  cb(ready);
+  return () => { readyListeners.delete(cb); };
 }
 
 /** Opens the jobs as extension-tracked tabs, then sends each application's

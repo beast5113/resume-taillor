@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { initExtensionBridge, isExtensionReady, openJobLinks } from "@/lib/extensionBridge";
+import { initExtensionBridge, isExtensionReady, onExtensionReadyChange, openJobLinks } from "@/lib/extensionBridge";
 
 interface Application {
   id: string;
@@ -226,7 +226,12 @@ export default function ApplicationsPage() {
   const uploadFileInputRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef(false);
 
-  useEffect(() => initExtensionBridge(), []);
+  const [extensionReady, setExtensionReady] = useState(false);
+  useEffect(() => {
+    const stopBridge = initExtensionBridge();
+    const unsubscribe = onExtensionReadyChange(setExtensionReady);
+    return () => { stopBridge(); unsubscribe(); };
+  }, []);
 
   // Debounce search — resets page atomically when it fires
   useEffect(() => {
@@ -332,15 +337,18 @@ export default function ApplicationsPage() {
   };
 
   const handleBulkOpenJobLinks = async () => {
-    const jobs = applications
-      .filter(a => selectedIds.has(a.id) && a.job_url)
-      .map(a => ({ seq: a.seq, url: a.job_url! }));
-    if (!jobs.length || bulkOpening) return;
+    const targets = applications.filter(a => selectedIds.has(a.id) && a.job_url);
+    if (!targets.length || bulkOpening) return;
+    const jobs = targets.map(a => ({ seq: a.seq, url: a.job_url! }));
     setBulkOpening(true);
+    // Also mark each affected row as opening, so the big centered indicator's
+    // count and the per-row spinners stay in sync for a bulk open.
+    setOpeningJobIds(prev => { const next = new Set(prev); targets.forEach(a => next.add(a.id)); return next; });
     try {
       await openJobLinks(jobs);
     } finally {
       setBulkOpening(false);
+      setOpeningJobIds(prev => { const next = new Set(prev); targets.forEach(a => next.delete(a.id)); return next; });
     }
   };
 
@@ -574,13 +582,48 @@ export default function ApplicationsPage() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="px-4 sm:px-8 py-4 sm:py-6 border-b border-border flex items-center justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex items-center gap-2">
           <h1 className="text-base sm:text-lg font-semibold text-foreground">Applications</h1>
+          <Tooltip.Provider>
+            <Tooltip.Root>
+              <Tooltip.Trigger className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full border cursor-default shrink-0 ${
+                extensionReady
+                  ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+                  : "text-muted-foreground border-border bg-muted/30"
+              }`}>
+                <span className={`size-1.5 rounded-full ${extensionReady ? "bg-emerald-400" : "bg-muted-foreground/50"}`} />
+                <span className="hidden sm:inline">{extensionReady ? "Extension connected" : "Extension not detected"}</span>
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Positioner sideOffset={6}>
+                  <Tooltip.Popup className="z-50 rounded-md bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10 max-w-64">
+                    {extensionReady
+                      ? "The Resume Tailor browser extension is active on this page — job links open through it and carry the application's resume context into the tab."
+                      : "The Resume Tailor browser extension wasn't detected on this page. Job links will open as plain browser tabs instead, with no resume context sent along."}
+                  </Tooltip.Popup>
+                </Tooltip.Positioner>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          </Tooltip.Provider>
         </div>
         <Button variant="outline" size="sm" onClick={() => setRefreshKey(k => k + 1)} className="shrink-0">
           <RefreshCw size={13} /><span className="hidden sm:inline">Refresh</span>
         </Button>
       </div>
+
+      {/* Big centered status indicator while job link(s) are being opened through
+          the extension — fixed to the viewport so it stays visible regardless of
+          scroll position, and non-interactive so it never blocks the page. */}
+      {openingJobIds.size > 0 && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
+          <div className="pointer-events-none flex flex-col items-center gap-3 bg-card ring-1 ring-foreground/10 shadow-2xl rounded-2xl px-10 py-8">
+            <Loader2 size={36} className="animate-spin text-primary" />
+            <p className="text-sm font-medium text-foreground">
+              Opening {openingJobIds.size} job link{openingJobIds.size === 1 ? "" : "s"}…
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-4 sm:py-6">
         <div className="space-y-4">

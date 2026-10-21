@@ -29,11 +29,49 @@ const EMPTY_BASIC_INFO: ProfileBasicInfo = {
   note: "",
 };
 
+/** Education used to be flat top-level fields (`University`, `education_start`,
+ * etc., with a capital U) before it was nested under `education`. A profile
+ * saved under the old shape has no `education` key at all, so without this
+ * lift its real data would silently disappear from the form (and get
+ * overwritten with blanks on next Save) even though it's still sitting right
+ * there under the legacy names. */
+function liftLegacyEducation(parsed: Record<string, unknown>): Partial<ProfileBasicInfo["education"]> {
+  const legacy = parsed as {
+    University?: string; unverstisity_locatoin_city?: string; unverstisity_locatoin_state?: string;
+    unverstisity_locatoin_state_abb?: string; education_start?: string; education_end?: string;
+  };
+  const lifted: Partial<ProfileBasicInfo["education"]> = {};
+  if (legacy.University) lifted.university = legacy.University;
+  if (legacy.unverstisity_locatoin_city) lifted.unverstisity_locatoin_city = legacy.unverstisity_locatoin_city;
+  if (legacy.unverstisity_locatoin_state) lifted.unverstisity_locatoin_state = legacy.unverstisity_locatoin_state;
+  if (legacy.unverstisity_locatoin_state_abb) lifted.unverstisity_locatoin_state_abb = legacy.unverstisity_locatoin_state_abb;
+  if (legacy.education_start) lifted.education_start = legacy.education_start;
+  if (legacy.education_end) lifted.education_end = legacy.education_end;
+  return lifted;
+}
+
+/** Field-by-field merge (not a shallow object spread) because a profile saved
+ * mid-migration can have a nested `education` object whose fields are present
+ * but blank alongside real data still sitting under the legacy flat keys -
+ * a plain `{...legacy, ...nested}` spread would let those blanks clobber the
+ * real values back out. A truthy value wins regardless of which side it's on. */
+function mergeEducation(parsed: Record<string, unknown>): ProfileBasicInfo["education"] {
+  const nested = (parsed?.education ?? {}) as Partial<ProfileBasicInfo["education"]>;
+  const legacy = liftLegacyEducation(parsed);
+  const merged = { ...EMPTY_EDUCATION };
+  (Object.keys(EMPTY_EDUCATION) as (keyof ProfileBasicInfo["education"])[]).forEach((key) => {
+    merged[key] = nested[key] || legacy[key] || "";
+  });
+  return merged;
+}
+
 /** Tolerates a null/missing/malformed `profiles.profile_basic` and merges in
  * any fields a stored object might be missing (e.g. saved before a key was
  * added), so the form never crashes on an unexpected shape. `education` is
  * merged one level deep so a partially-filled nested object doesn't wipe out
- * the other education fields' defaults. */
+ * the other education fields' defaults - and legacy flat education keys are
+ * lifted into it first, so old data saved before the nesting change doesn't
+ * silently read back as empty. */
 function parseBasicInfo(raw: string | null): ProfileBasicInfo {
   if (!raw) return EMPTY_BASIC_INFO;
   try {
@@ -41,7 +79,7 @@ function parseBasicInfo(raw: string | null): ProfileBasicInfo {
     return {
       ...EMPTY_BASIC_INFO,
       ...parsed,
-      education: { ...EMPTY_EDUCATION, ...(parsed?.education ?? {}) },
+      education: mergeEducation(parsed),
     };
   } catch {
     return EMPTY_BASIC_INFO;
