@@ -58,6 +58,7 @@ export interface ProfileBasicInfo {
     unverstisity_locatoin_city: string;
     unverstisity_locatoin_state: string;
     unverstisity_locatoin_state_abb: string;
+    field_study: string;
     education_start: string;
     education_end: string;
   };

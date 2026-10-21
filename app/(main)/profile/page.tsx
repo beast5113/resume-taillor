@@ -19,7 +19,7 @@ function splitLegacyName(name: string): { first: string; last: string } {
 
 const EMPTY_EDUCATION: ProfileBasicInfo["education"] = {
   university: "", unverstisity_locatoin_city: "", unverstisity_locatoin_state: "",
-  unverstisity_locatoin_state_abb: "", education_start: "", education_end: "",
+  unverstisity_locatoin_state_abb: "", field_study: "", education_start: "", education_end: "",
 };
 
 const EMPTY_BASIC_INFO: ProfileBasicInfo = {
@@ -67,6 +67,7 @@ const EDUCATION_FIELDS: { key: keyof ProfileBasicInfo["education"]; label: strin
   { key: "unverstisity_locatoin_city", label: "University City" },
   { key: "unverstisity_locatoin_state", label: "University State" },
   { key: "unverstisity_locatoin_state_abb", label: "University State Abbreviation", placeholder: "e.g. TX" },
+  { key: "field_study", label: "Field of Study" },
   { key: "education_start", label: "Education Start", placeholder: "YYYY-MM" },
   { key: "education_end", label: "Education End", placeholder: "YYYY-MM" },
 ];
