@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { after } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireBearerAuth } from "@/lib/auth";
-import { generateFromTemplate } from "@/lib/generateResume";
-import { uploadResumeToDrive } from "@/lib/googleDrive";
-import { buildResumeFilename } from "@/lib/resumeFilename";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -16,6 +12,10 @@ export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
+/** Creates an application record from the extension's job capture. Resumes are
+ * never generated here - every application lands as "pending" and gets its
+ * JSON submitted later (AutoGen, Batch Builder's paste-JSON, or the "Copy
+ * Prompt" + paste-back flow), never via a direct in-app OpenAI call. */
 export async function POST(request: NextRequest) {
   const session = await requireBearerAuth(request);
   if (!session) {
@@ -28,18 +28,14 @@ export async function POST(request: NextRequest) {
   let job_description: string | undefined;
   let template_id: string | undefined;
   let profile_id: string | undefined;
-  let tailor_flag: boolean;
-  let batch_mode: boolean | undefined;
   let job_board: string | undefined;
   let salary: string | undefined;
 
   try {
-    ({ job_url, role, company_name, job_description, template_id, profile_id, tailor_flag, batch_mode, job_board, salary } = await request.json());
+    ({ job_url, role, company_name, job_description, template_id, profile_id, job_board, salary } = await request.json());
   } catch {
     return NextResponse.json({ message: "Invalid request body" }, { status: 400, headers: CORS_HEADERS });
   }
-
-  const shouldTailor = tailor_flag === true && batch_mode !== true;
 
   if (!role?.trim() || !company_name?.trim()) {
     return NextResponse.json(
@@ -48,16 +44,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (shouldTailor && !job_description?.trim()) {
-    return NextResponse.json(
-      { message: "job_description is required when tailor_flag is true" },
-      { status: 400, headers: CORS_HEADERS }
-    );
-  }
-
-  let profileName = "";
-  let profileFirstName: string | null = null;
-  let profileLastName: string | null = null;
   let resolvedProfileId: string | null = null;
   let profileDefaultTemplateId: string | null = null;
 
@@ -67,24 +53,20 @@ export async function POST(request: NextRequest) {
     // applications against a profile that's been turned off.
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, name, first_name, last_name, default_template_id")
+      .select("id, default_template_id")
       .eq("id", profile_id.trim())
       .eq("is_active", true)
       .maybeSingle();
     if (profile) {
       resolvedProfileId = profile.id;
-      profileName = profile.name ?? "";
-      profileFirstName = profile.first_name;
-      profileLastName = profile.last_name;
       profileDefaultTemplateId = profile.default_template_id ?? null;
     }
   }
 
   // Extension-provided template wins; otherwise fall back to the profile's own
-  // default template, then to the instance-wide DEFAULT_TEMPLATE_ID (env-only,
-  // never persisted below since it isn't tied to any particular profile).
+  // default template. Purely metadata for whoever renders this application's
+  // resume later - nothing here triggers generation.
   const storedTemplateId = template_id?.trim() || profileDefaultTemplateId;
-  const templateId = shouldTailor ? (storedTemplateId || process.env.DEFAULT_TEMPLATE_ID) : undefined;
 
   const { data: application, error: insertError } = await supabase
     .from("applications")
@@ -96,7 +78,7 @@ export async function POST(request: NextRequest) {
       profile_id: resolvedProfileId,
       template_id: storedTemplateId,
       created_by: session.userId,
-      status: shouldTailor && templateId ? "generating" : "pending",
+      status: "pending",
       pipeline_status: "saved",
       job_board: job_board?.trim() || null,
       salary: salary?.trim() || null,
@@ -106,49 +88,6 @@ export async function POST(request: NextRequest) {
 
   if (insertError || !application) {
     return NextResponse.json({ message: insertError?.message ?? "Insert failed" }, { status: 500, headers: CORS_HEADERS });
-  }
-
-  if (shouldTailor && templateId) {
-    after(async () => {
-      try {
-        const backgroundInfo = profileName ? `Name: ${profileName}` : "";
-        const { buffer, filename, salary: extractedSalary, resumeJson } = await generateFromTemplate(
-          templateId,
-          backgroundInfo,
-          job_description!.trim(),
-          { role }
-        );
-
-        const driveFilename = buildResumeFilename(
-          profileFirstName,
-          profileLastName,
-          profileName,
-          company_name,
-          filename.replace(/\.docx$/i, "")
-        );
-        const { fileId, driveLink } = await uploadResumeToDrive(buffer, driveFilename);
-
-        await supabase
-          .from("applications")
-          .update({
-            status: "completed",
-            google_drive_link: driveLink,
-            google_drive_file_id: fileId,
-            resume_json: JSON.stringify(resumeJson),
-            // The extension-provided salary (set above, if any) always wins;
-            // this only fills the gap when that was null and the job description
-            // itself had a figure the model could extract.
-            ...(application.salary ? {} : extractedSalary ? { salary: extractedSalary } : {}),
-          })
-          .eq("id", application.id);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        await supabase
-          .from("applications")
-          .update({ status: "failed", error_message: msg })
-          .eq("id", application.id);
-      }
-    });
   }
 
   return NextResponse.json(application, { status: 202, headers: CORS_HEADERS });

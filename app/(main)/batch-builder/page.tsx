@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
-  Loader2, Download, Check, Copy, Zap, Code2,
+  Loader2, Download, Check, Copy, Code2,
   ChevronLeft, ChevronRight, PackageCheck, AlertTriangle,
   RefreshCw, Upload,
 } from "lucide-react";
@@ -33,7 +33,6 @@ interface Profile { id: string; name: string; }
 
 type CardPhase =
   | "idle"
-  | "generating"
   | "building"
   | "ready"
   | "copying"
@@ -63,7 +62,6 @@ function AppCard({
   templates,
   profiles,
   state,
-  onGenerate,
   onBuildJson,
   onCopyPrompt,
   onDownload,
@@ -73,7 +71,6 @@ function AppCard({
   templates: DocxTemplate[];
   profiles: Profile[];
   state: CardState;
-  onGenerate: (templateId: string) => void;
   onBuildJson: (json: string, templateId: string) => void;
   onCopyPrompt: (templateId: string) => void;
   onDownload: () => void;
@@ -97,7 +94,7 @@ function AppCard({
   };
 
   const { phase, error } = state;
-  const busy = phase === "generating" || phase === "building" || phase === "uploading" || phase === "copying";
+  const busy = phase === "building" || phase === "uploading" || phase === "copying";
 
   if (phase === "done") {
     return (
@@ -188,11 +185,6 @@ function AppCard({
         )}
 
         {/* Status feedback */}
-        {phase === "generating" && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 size={12} className="animate-spin" />Generating with AI…
-          </div>
-        )}
         {phase === "building" && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 size={12} className="animate-spin" />Building from JSON…
@@ -222,16 +214,8 @@ function AppCard({
 
         {/* Actions */}
         <div className="flex flex-wrap gap-1.5 mt-auto pt-1 border-t border-border">
-          {(phase === "idle" || phase === "error" || phase === "building" || phase === "generating" || phase === "copying") && (
+          {(phase === "idle" || phase === "error" || phase === "building" || phase === "copying") && (
             <>
-              <button
-                onClick={() => onGenerate(templateId)}
-                disabled={!templateId || busy}
-                title={!templateId ? "Select a template first" : "Generate with AI"}
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-all disabled:opacity-40 disabled:pointer-events-none"
-              >
-                <Zap size={11} />AI
-              </button>
               <button
                 onClick={() => {
                   if (!templateId) return;
@@ -245,7 +229,7 @@ function AppCard({
                 }}
                 disabled={!templateId || !jsonInput.trim() || busy}
                 title={!templateId ? "Select a template first" : !jsonInput.trim() ? "Paste JSON above first" : "Build from JSON"}
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent text-xs font-medium transition-all disabled:opacity-40 disabled:pointer-events-none"
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-all disabled:opacity-40 disabled:pointer-events-none"
               >
                 <Code2 size={11} />Build
               </button>
@@ -285,14 +269,6 @@ function AppCard({
               >
                 {copied ? <Check size={11} className="text-green-500" /> : <Copy size={11} />}
                 Prompt
-              </button>
-              <button
-                onClick={() => onGenerate(templateId)}
-                disabled={!templateId}
-                title="Regenerate with AI"
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent text-xs font-medium transition-all disabled:opacity-40 disabled:pointer-events-none"
-              >
-                <RefreshCw size={11} />Regen
               </button>
             </>
           )}
@@ -349,29 +325,6 @@ export default function BatchBuilderPage() {
 
   const getCard = (id: string): CardState =>
     cardStates[id] ?? { phase: "idle", file: null, error: null };
-
-  const handleGenerate = async (app: Application, templateId: string) => {
-    if (!templateId) return;
-    setCardPhase(app.id, "generating");
-    try {
-      const res = await fetch(`/api/batch-builder/${app.id}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateId }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setCardPhase(app.id, "error", { error: data.message ?? "Generation failed" });
-        return;
-      }
-      const filename = res.headers.get("X-Filename") ?? "resume.docx";
-      const buffer = await res.arrayBuffer();
-      fileBuffers.current[app.id] = { data: buffer, filename };
-      setCardPhase(app.id, "ready", { file: { data: buffer, filename } });
-    } catch (e) {
-      setCardPhase(app.id, "error", { error: e instanceof Error ? e.message : "Network error" });
-    }
-  };
 
   const handleBuildJson = async (app: Application, jsonStr: string, templateId: string) => {
     if (!templateId) return;
@@ -509,7 +462,6 @@ export default function BatchBuilderPage() {
                   templates={templates}
                   profiles={profiles}
                   state={getCard(app.id)}
-                  onGenerate={templateId => handleGenerate(app, templateId)}
                   onBuildJson={(json, templateId) => handleBuildJson(app, json, templateId)}
                   onCopyPrompt={templateId => handleCopyPrompt(app, templateId)}
                   onDownload={() => handleDownload(app)}

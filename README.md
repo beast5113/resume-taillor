@@ -1,9 +1,12 @@
 # Resume Tailor
 
 Internal web app that generates ATS-tailored resumes (and cover letters) from a job
-description, using OpenAI for the writing, DOCX templates for formatting, and Google
-Drive for delivering the final file. A companion Chrome extension ("AutoGen") drives
-part of the pipeline through this app's API.
+description, using DOCX templates for formatting and Google Drive for delivering the
+final file. The actual resume content is written externally by ChatGPT - this app
+never calls an LLM API directly; it builds the prompt, and takes the JSON reply back
+in, either pasted by hand ("Copy Prompt" → ChatGPT → paste the JSON back) or via a
+companion Chrome extension ("AutoGen") that automates that same loop through this
+app's API.
 
 This document is written for someone who has **zero prior context** on this project.
 It covers the full local setup, the Supabase database/storage setup, Google Drive
@@ -18,16 +21,15 @@ integration, the auth/webhook model, deployment, and a handover checklist.
 5. [Step 1 – Supabase project (database + storage)](#step-1--supabase-project-database--storage)
 6. [Step 2 – Create the first admin user](#step-2--create-the-first-admin-user)
 7. [Step 3 – Google Drive setup](#step-3--google-drive-setup)
-8. [Step 4 – OpenAI setup](#step-4--openai-setup)
-9. [Step 5 – Run it locally](#step-5--run-it-locally)
-10. [First-run checklist (make it actually generate something)](#first-run-checklist-make-it-actually-generate-something)
-11. [Auth model & the webhook / Chrome extension integration](#auth-model--the-webhook--chrome-extension-integration)
-12. [Deploying to production](#deploying-to-production)
-13. [Project structure](#project-structure)
-14. [Feature map (what each page does)](#feature-map-what-each-page-does)
-15. [Security notes](#security-notes)
-16. [Handover checklist (do this when taking over the project)](#handover-checklist-do-this-when-taking-over-the-project)
-17. [Troubleshooting](#troubleshooting)
+8. [Step 4 – Run it locally](#step-4--run-it-locally)
+9. [First-run checklist (make it actually generate something)](#first-run-checklist-make-it-actually-generate-something)
+10. [Auth model & the webhook / Chrome extension integration](#auth-model--the-webhook--chrome-extension-integration)
+11. [Deploying to production](#deploying-to-production)
+12. [Project structure](#project-structure)
+13. [Feature map (what each page does)](#feature-map-what-each-page-does)
+14. [Security notes](#security-notes)
+15. [Handover checklist (do this when taking over the project)](#handover-checklist-do-this-when-taking-over-the-project)
+16. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -45,8 +47,9 @@ integration, the auth/webhook model, deployment, and a handover checklist.
 │  - Web UI (login-gated) for admins/assistants                      │
 │  - /api/* routes: applications, templates, prompts, team, webhook, │
 │    autogen/*                                                       │
-│  - OpenAI call to write tailored resume JSON                       │
-│  - docxtemplater fills a .docx template with that JSON             │
+│  - Builds the ChatGPT prompt; never calls an LLM API itself        │
+│  - docxtemplater fills a .docx template with the JSON ChatGPT      │
+│    returns (pasted back by hand, or via AutoGen)                   │
 └───────────┬───────────────────────────────────────┬───────────────┘
             │                                        │
             ▼                                        ▼
@@ -72,7 +75,7 @@ the single most important thing to understand before touching anything auth-rela
 - **Database**: Supabase (hosted Postgres)
 - **File storage**: Supabase Storage (for uploaded `.docx` templates) + Google Drive
   (for generated resumes/cover letters)
-- **AI**: OpenAI API (`openai` npm package)
+- **AI**: ChatGPT, used externally (no LLM API call anywhere in this codebase) — this app only builds the prompt and parses the JSON reply back
 - **DOCX generation**: `docxtemplater` + `pizzip`
 - **Auth**: custom, HMAC-signed session tokens, `bcryptjs` for password hashing
 - **Styling**: Tailwind CSS v4, shadcn-style components (`components/ui`)
@@ -85,7 +88,7 @@ Before you start, get accounts/access to:
   yarn/pnpm, to avoid lockfile drift)
 - A **Supabase** account (https://supabase.com) — free tier is fine to start
 - A **Google Cloud** account (for the Drive integration)
-- An **OpenAI** API key with billing enabled
+- A ChatGPT account to paste prompts into (no API key needed - this app never calls an LLM API)
 - Wherever you plan to deploy (Vercel is the natural fit for Next.js — see
   [Deploying](#deploying-to-production))
 
@@ -99,13 +102,9 @@ cp .env.example .env
 
 | Variable | Required? | Purpose |
 |---|---|---|
-| `OPENAI_API_KEY` | **Yes** | OpenAI API key used to generate resume content. |
-| `OPENAI_MODEL` | No (has default) | Model id, e.g. `gpt-4o`. See `lib/models.ts` for the list the UI offers. |
-| `REASONING_EFFORT` | No (default `medium`) | Passed to reasoning-capable models: `none\|low\|medium\|high\|xhigh`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | **Yes** | Your Supabase project URL. |
 | `SUPABASE_SERVICE_KEY` | **Yes** | Supabase **service role** key (not the anon key — see [Security notes](#security-notes)). |
 | `SESSION_SECRET` | **Yes** | Secret used to HMAC-sign session tokens (web login cookie *and* API/webhook bearer tokens). Generate with `openssl rand -hex 32`. Rotating this instantly logs out every user and Chrome-extension session. |
-| `DEFAULT_TEMPLATE_ID` | No | UUID of a row in `docx_templates`. If set, this template is used as a fallback whenever an application has no template of its own assigned (webhook intake, autogen claim flow). Leave blank until you've uploaded at least one template and copied its id. |
 | `GOOGLE_CLIENT_ID` | **Yes** (for Drive delivery) | OAuth2 client id from Google Cloud Console. |
 | `GOOGLE_CLIENT_SECRET` | **Yes** | OAuth2 client secret. |
 | `GOOGLE_REFRESH_TOKEN` | **Yes** | Long-lived refresh token for a Google account that has access to the target Drive folder. See [Step 3](#step-3--google-drive-setup). |
@@ -212,13 +211,7 @@ uploads — i.e. **anyone with the link can view it**, no Google login required;
    (`https://drive.google.com/drive/folders/<THIS_PART>`) → `GOOGLE_DRIVE_FOLDER_ID`.
    If left blank, files upload to the account's Drive root instead.
 
-## Step 4 – OpenAI setup
-
-Just an API key with billing enabled: https://platform.openai.com/api-keys →
-`OPENAI_API_KEY`. Optionally set `OPENAI_MODEL` (see `lib/models.ts` for the ids the
-UI dropdown offers) and `REASONING_EFFORT`.
-
-## Step 5 – Run it locally
+## Step 4 – Run it locally
 
 ```bash
 npm install
@@ -250,11 +243,10 @@ until you seed a little data through the UI:
    prompts configured.
 4. (Optional) **Profiles** page → add candidate background info used when
    generating manually.
-5. **Generate** or **Builder** page → paste a job description, pick a template, run
-   a generation, confirm a `.docx` shows up in your configured Google Drive
-   location.
-6. If you'll use the fallback-template webhook flow, copy the new template's id
-   into `DEFAULT_TEMPLATE_ID`.
+5. **Batch Builder** page → pick an application + template, hit **Prompt** to copy
+   the full prompt, paste it into ChatGPT, then paste ChatGPT's JSON reply back into
+   the **Build** box to confirm a `.docx` gets produced. (**Builder** page works the
+   same way for a one-off, not-tied-to-an-application JSON blob.)
 
 ## Auth model & the webhook / Chrome extension integration
 
@@ -288,16 +280,16 @@ curl -X POST https://your-deployment.example.com/api/auth/login \
   -d '{"email":"you@example.com","password":"your-password"}'
 # → { "token": "...", "expiresAt": "...", ... }
 
-# 2. Use it against the webhook (creates an application, optionally
-#    auto-tailors + uploads to Drive if tailor_flag is true)
+# 2. Use it against the webhook (creates an application, always "pending" -
+#    the resume itself is generated later via the AutoGen extension or
+#    Batch Builder's Copy Prompt / paste-JSON flow, never by this call)
 curl -X POST https://your-deployment.example.com/api/webhook \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
         "role": "Senior Backend Engineer",
         "company_name": "Acme Corp",
-        "job_description": "…",
-        "tailor_flag": true
+        "job_description": "…"
       }'
 ```
 
@@ -320,7 +312,7 @@ Node.js host that can run `npm run build` + `npm run start` works too.
 2. Add **every** variable from [Environment variables](#environment-variables)
    (except the dead ones) to the project's environment settings. Do this for all
    environments you use (Production/Preview) — don't forget Preview if you rely on
-   PR previews, since Supabase/Drive/OpenAI keys aren't inherited automatically per
+   PR previews, since Supabase/Drive keys aren't inherited automatically per
    environment.
 3. Deploy. Build command `npm run build`, output is the default Next.js output —
    no special config needed beyond what's already in `next.config.ts`.
@@ -337,7 +329,7 @@ Node.js host that can run `npm run build` + `npm run start` works too.
 ```
 app/
   (main)/            Authenticated UI pages: dashboard, builder, batch-builder,
-                      generate, applications, job-board, templates, prompts,
+                      applications, job-board, templates, prompts,
                       profile, team
   login/              Login page + server action
   api/                All backend routes (see Feature map below)
@@ -346,12 +338,10 @@ lib/
   supabase.ts         Supabase client (service role)
   auth.ts             Custom session/auth logic
   googleDrive.ts       Google Drive upload/download/delete
-  generateResume.ts     OpenAI call + orchestration for a single generation
-  docxTemplater.ts       Fills .docx templates with generated data
-  promptBuilder.ts        Assembles the full prompt sent to OpenAI
+  docxTemplater.ts       Fills .docx templates with the JSON ChatGPT returns
+  promptBuilder.ts        Assembles the full prompt to paste into ChatGPT
   promptResolution.ts      Resolves which system prompt to use (see Step: First run)
   autogenClaim.ts           Claim/lock logic for the AutoGen extension flow
-  models.ts                  OpenAI model choices shown in the UI
 scripts/
   create-admin.mjs            Bootstraps the very first admin account
   get-refresh-token.mjs         One-time Google OAuth refresh-token helper
@@ -366,9 +356,11 @@ resumeBuilder.js                     Standalone one-off docx-building script
 ## Feature map (what each page does)
 
 - **Dashboard** — overview/metrics.
-- **Builder** — manual single-resume generation flow.
-- **Batch builder** — generate multiple resumes at once.
-- **Generate** — the core "job description → tailored resume" flow.
+- **Builder** — paste a JSON resume blob (produced by ChatGPT), render it against
+  a template, one off, not tied to any application.
+- **Batch builder** — the same build-from-JSON flow, batched across every
+  `pending` application: pick a template, copy its prompt into ChatGPT, paste the
+  JSON reply back in, download/upload per card.
 - **Applications / Job board** — tracks each application's pipeline status,
   recruiter contact info, Drive link, scheduling; this is also the table the
   webhook and autogen endpoints read/write.
@@ -420,7 +412,6 @@ previous owner had access to as compromised and rotate it:
 - [ ] Rotate/replace the Google OAuth client secret in Google Cloud Console, and
       re-run `scripts/get-refresh-token.mjs` to issue a fresh refresh token tied
       to the new secret.
-- [ ] Rotate the OpenAI API key.
 - [ ] Review `team_users` — disable (`is_active = false`) or remove any accounts
       that shouldn't retain access, and have remaining admins reset their
       passwords.
@@ -441,11 +432,10 @@ previous owner had access to as compromised and rotate it:
   unset; thrown from `lib/googleDrive.ts`.
 - **Login always fails / "Server credentials not configured"** — `SESSION_SECRET`
   is empty; set it and redeploy/restart.
-- **Nothing happens when generating from the webhook** — check `templateId` was
-  resolved: either the request included one, or the application's own
-  `template_id` is set, or `DEFAULT_TEMPLATE_ID` is configured. Without any of
-  those, `shouldTailor` short-circuits and the application is just saved as
-  `pending` with no generation attempted.
+- **An application never leaves "pending"** — the webhook only ever creates
+  applications as `pending`; it's always on you (or AutoGen) to actually generate
+  one via Batch Builder's Copy Prompt / paste-JSON flow, or the AutoGen extension.
+  There is no auto-generation path anymore.
 - **401s from the webhook/extension** — the Bearer token expired (sessions last
   24h from creation, per `schema.sql`'s default on `sessions.expires_at`) or the
   `sessions` row was deleted; log in again via `/api/auth/login` to get a fresh

@@ -4,14 +4,16 @@ import { resolveSystemPrompt } from "@/lib/promptResolution";
 
 /**
  * Shared prompt-building + answer-parsing helpers used by every code path that
- * turns an application + a docx template into a ChatGPT/OpenAI prompt, or turns
- * an LLM reply back into JSON:
+ * turns an application + a docx template into a ChatGPT prompt, or turns a
+ * pasted LLM reply back into JSON:
  *   - app/api/batch-builder/[id]/prompt (the "Copy Prompt" button)
- *   - lib/generateResume.ts (the in-app OpenAI generation)
  *   - app/api/autogen/* (the AutoGen extension backend)
  *
- * Keeping these in one place means all three stay in sync - the prompt AutoGen
- * pastes into ChatGPT is byte-for-byte the same as the one the app builds.
+ * There is no direct in-app OpenAI call anywhere - every resume is generated
+ * externally (ChatGPT, manually or via AutoGen) and its JSON submitted back.
+ * Keeping these in one place means both paths stay in sync - the prompt
+ * AutoGen pastes into ChatGPT is byte-for-byte the same as the one "Copy
+ * Prompt" shows you to paste in yourself.
  */
 
 /** Builds the user-prompt body from the template's variables + job context.
