@@ -24,7 +24,7 @@ const EMPTY_EDUCATION: ProfileBasicInfo["education"] = {
 
 const EMPTY_BASIC_INFO: ProfileBasicInfo = {
   first_name: "", last_name: "", dob: "", address: "", city: "", state: "", state_abb: "", zip: "",
-  email: "", phone: "", linkedin: "",
+  email: "", phone: "", linkedin: "", github: "",
   education: EMPTY_EDUCATION,
   note: "",
 };
@@ -93,6 +93,7 @@ const BASIC_INFO_FIELDS: { key: keyof Omit<ProfileBasicInfo, "education" | "note
   { key: "email", label: "Email" },
   { key: "phone", label: "Phone", placeholder: "(XXX) XXX-XXXX" },
   { key: "linkedin", label: "LinkedIn (Optional)" },
+  { key: "github", label: "GitHub (Optional)", placeholder: "https://github.com/username" },
   { key: "address", label: "Address" },
   { key: "city", label: "City" },
   { key: "state", label: "State" },

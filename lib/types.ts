@@ -53,6 +53,7 @@ export interface ProfileBasicInfo {
   email: string;
   phone: string;
   linkedin: string;
+  github: string;
   education: {
     university: string;
     unverstisity_locatoin_city: string;
