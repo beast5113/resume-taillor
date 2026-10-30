@@ -59,6 +59,7 @@ const PIPELINE_OPTIONS = [
   { value: "tech_2",       label: "Tech 2" },
   { value: "offer",        label: "Offer" },
   { value: "failed",       label: "Failed" },
+  { value: "closed",       label: "Closed" },
 ];
 
 const PIPELINE_COLORS: Record<string, string> = {
@@ -71,6 +72,7 @@ const PIPELINE_COLORS: Record<string, string> = {
   tech_2:       "text-orange-500",
   offer:        "text-green-500",
   failed:       "text-destructive",
+  closed:       "text-slate-500",
 };
 
 const STATUS_OPTIONS = ["pending", "generating", "completed", "failed"];
