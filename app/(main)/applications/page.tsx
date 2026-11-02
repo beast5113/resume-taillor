@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 
 import {
   RefreshCw, Download, ExternalLink, Trash2, Inbox,
   Search, ChevronLeft, ChevronRight, Copy, Check,
-  AlertTriangle, FileText, X, Pencil, Upload, UploadCloud, DollarSign, Loader2,
+  AlertTriangle, FileText, X, Pencil, Upload, UploadCloud, DollarSign, Loader2, CopyPlus,
 } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Tooltip } from "@base-ui/react/tooltip";
@@ -37,8 +37,9 @@ interface Application {
   updated_at: string;
 }
 
-interface Profile  { id: string; name: string; is_active: boolean; }
+interface Profile  { id: string; name: string; is_active: boolean; default_template_id: string | null; }
 interface TeamUser { id: string; name: string; role: string; }
+interface Template { id: string; name: string; }
 
 const PAGE_SIZE = 20;
 
@@ -224,6 +225,12 @@ export default function ApplicationsPage() {
   const [salaryModal, setSalaryModal] = useState<{ open: boolean; app: Application | null; draft: string; saving: boolean }>({
     open: false, app: null, draft: "", saving: false,
   });
+
+  const [duplicateModal, setDuplicateModal] = useState<{
+    open: boolean; profileId: string; templateId: string;
+    templates: Template[]; loadingTemplates: boolean;
+    submitting: boolean; error: string | null;
+  }>({ open: false, profileId: "", templateId: "", templates: [], loadingTemplates: false, submitting: false, error: null });
 
   const uploadFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -500,6 +507,44 @@ export default function ApplicationsPage() {
     setConfirmBulkDelete(false);
   };
 
+  const openDuplicate = () =>
+    setDuplicateModal({ open: true, profileId: "", templateId: "", templates: [], loadingTemplates: false, submitting: false, error: null });
+
+  /** Picking a profile loads its templates and preselects the profile's default. */
+  const handleDuplicateProfileChange = async (profileId: string) => {
+    setDuplicateModal(prev => ({ ...prev, profileId, templateId: "", templates: [], loadingTemplates: !!profileId, error: null }));
+    if (!profileId) return;
+    const res = await fetch(`/api/templates?profile_id=${encodeURIComponent(profileId)}`);
+    const templates: Template[] = res.ok ? await res.json() : [];
+    const defaultId = profiles.find(p => p.id === profileId)?.default_template_id ?? "";
+    setDuplicateModal(prev => prev.profileId !== profileId ? prev : {
+      ...prev, templates, loadingTemplates: false,
+      templateId: templates.some(t => t.id === defaultId) ? defaultId : (templates[0]?.id ?? ""),
+    });
+  };
+
+  const handleDuplicateSubmit = async () => {
+    if (selectedIds.size === 0 || !duplicateModal.profileId || !duplicateModal.templateId) return;
+    setDuplicateModal(prev => ({ ...prev, submitting: true, error: null }));
+    const res = await fetch("/api/applications/duplicate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selectedIds), profile_id: duplicateModal.profileId, template_id: duplicateModal.templateId }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setDuplicateModal(prev => ({ ...prev, submitting: false, error: data.message ?? "Duplicate failed" }));
+      return;
+    }
+    setDuplicateModal(prev => ({ ...prev, open: false, submitting: false }));
+    setSelectedIds(new Set());
+    if (page === 1) setRefreshKey(k => k + 1); else setPage(1);
+  };
+
+  const duplicateSameProfileCount = duplicateModal.profileId
+    ? applications.filter(a => selectedIds.has(a.id) && a.profile_id === duplicateModal.profileId).length
+    : 0;
+
   const startEdit = (app: Application) => {
     setEditingId(app.id);
     setEditFields({ company_name: app.company_name, role: app.role });
@@ -770,6 +815,12 @@ export default function ApplicationsPage() {
                     className="size-7 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:pointer-events-none"
                     title="Download selected resumes">
                     <Download size={12} />
+                  </button>
+                  <button
+                    onClick={openDuplicate}
+                    className="size-7 flex items-center justify-center rounded-lg border border-input bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                    title="Duplicate selected for another profile / template">
+                    <CopyPlus size={12} />
                   </button>
                   <button
                     onClick={() => setConfirmBulkDelete(true)}
@@ -1238,6 +1289,92 @@ export default function ApplicationsPage() {
               <Button size="sm" onClick={handleUploadSubmit}
                 disabled={!uploadModal.file || !uploadModal.profileId || uploadModal.uploading}>
                 {uploadModal.uploading ? "Uploading…" : "Upload to Drive"}
+              </Button>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Duplicate modal */}
+      <Dialog.Root open={duplicateModal.open} onOpenChange={open => { if (!open && !duplicateModal.submitting) setDuplicateModal(prev => ({ ...prev, open: false })); }}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 duration-150" />
+          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-md bg-card rounded-xl ring-1 ring-foreground/10 shadow-xl flex flex-col data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <div>
+                <Dialog.Title className="text-sm font-semibold text-foreground">
+                  Duplicate {selectedIds.size} application{selectedIds.size === 1 ? "" : "s"}
+                </Dialog.Title>
+                <Dialog.Description className="text-xs text-muted-foreground mt-0.5">
+                  Creates new pending applications for the same jobs under another profile
+                </Dialog.Description>
+              </div>
+              <Dialog.Close render={
+                <button disabled={duplicateModal.submitting}
+                  className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-40">
+                  <X size={14} />
+                </button>
+              } />
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">Profile</label>
+                <Select
+                  value={duplicateModal.profileId || "_none"}
+                  onValueChange={v => void handleDuplicateProfileChange(v === "_none" ? "" : (v ?? ""))}
+                  disabled={duplicateModal.submitting}
+                  items={[{ value: "_none", label: "Select a profile…" }, ...profiles.filter(p => p.is_active).map(p => ({ value: p.id, label: p.name }))]}
+                >
+                  <SelectTrigger className="h-9 text-sm w-full"><SelectValue placeholder="Select a profile…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none" className="text-xs text-muted-foreground">Select a profile…</SelectItem>
+                    {profiles.filter(p => p.is_active).map(p => <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {duplicateSameProfileCount > 0 && (
+                  <p className="text-[11px] text-yellow-500 flex items-center gap-1.5">
+                    <AlertTriangle size={11} />
+                    {duplicateSameProfileCount} of the selected already use{duplicateSameProfileCount === 1 ? "s" : ""} this profile
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">Template</label>
+                <Select
+                  value={duplicateModal.templateId || "_none"}
+                  onValueChange={v => setDuplicateModal(prev => ({ ...prev, templateId: v === "_none" ? "" : (v ?? "") }))}
+                  disabled={duplicateModal.submitting || !duplicateModal.profileId || duplicateModal.loadingTemplates}
+                  items={[{ value: "_none", label: "Select a template…" }, ...duplicateModal.templates.map(t => ({ value: t.id, label: t.name }))]}
+                >
+                  <SelectTrigger className="h-9 text-sm w-full">
+                    <SelectValue placeholder={duplicateModal.loadingTemplates ? "Loading…" : "Select a template…"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none" className="text-xs text-muted-foreground">Select a template…</SelectItem>
+                    {duplicateModal.templates.map(t => <SelectItem key={t.id} value={t.id} className="text-xs">{t.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {duplicateModal.profileId && !duplicateModal.loadingTemplates && duplicateModal.templates.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground">This profile has no templates yet.</p>
+                )}
+              </div>
+
+              {duplicateModal.error && (
+                <p className="text-xs text-destructive flex items-center gap-1.5">
+                  <AlertTriangle size={12} />{duplicateModal.error}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
+              <Dialog.Close render={
+                <Button variant="outline" size="sm" disabled={duplicateModal.submitting}>Cancel</Button>
+              } />
+              <Button size="sm" onClick={handleDuplicateSubmit}
+                disabled={!duplicateModal.profileId || !duplicateModal.templateId || duplicateModal.submitting}>
+                {duplicateModal.submitting ? "Generating…" : "Generate"}
               </Button>
             </div>
           </Dialog.Popup>
