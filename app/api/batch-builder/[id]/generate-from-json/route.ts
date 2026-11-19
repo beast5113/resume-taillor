@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
+import { canAccessApplication, canUseTemplate } from "@/lib/access";
 import { buildResumeFilename } from "@/lib/resumeFilename";
 import {
   renderDocxTemplate,
@@ -32,6 +33,11 @@ export async function POST(
     return NextResponse.json({ message: "templateId is required" }, { status: 400 });
   if (!jsonData || typeof jsonData !== "object" || Array.isArray(jsonData))
     return NextResponse.json({ message: "jsonData must be an object" }, { status: 400 });
+
+  if (!(await canAccessApplication(session, id)))
+    return NextResponse.json({ message: "Application not found" }, { status: 404 });
+  if (!(await canUseTemplate(session, templateId)))
+    return NextResponse.json({ message: "Template not found" }, { status: 404 });
 
   const { data: app } = await supabase
     .from("applications")

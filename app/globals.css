@@ -3,20 +3,20 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* HexNinja — re-tint the neutral zinc scale used across pages so it
-   harmonises with the ink/violet palette (class names unchanged). */
+/* HexNinja — re-tint the zinc scale used across pages to a clean,
+   cool graphite (Tailwind's default zinc leans purple). Class names unchanged. */
 @theme {
-  --color-zinc-50: oklch(0.985 0.003 275);
-  --color-zinc-100: oklch(0.965 0.006 275);
-  --color-zinc-200: oklch(0.915 0.01 275);
-  --color-zinc-300: oklch(0.86 0.014 275);
-  --color-zinc-400: oklch(0.72 0.02 275);
-  --color-zinc-500: oklch(0.58 0.024 275);
-  --color-zinc-600: oklch(0.46 0.026 275);
-  --color-zinc-700: oklch(0.36 0.028 275);
-  --color-zinc-800: oklch(0.27 0.028 275);
-  --color-zinc-900: oklch(0.21 0.024 275);
-  --color-zinc-950: oklch(0.16 0.02 275);
+  --color-zinc-50: oklch(0.985 0.002 255);
+  --color-zinc-100: oklch(0.967 0.003 255);
+  --color-zinc-200: oklch(0.92 0.005 255);
+  --color-zinc-300: oklch(0.87 0.007 255);
+  --color-zinc-400: oklch(0.71 0.01 255);
+  --color-zinc-500: oklch(0.56 0.012 255);
+  --color-zinc-600: oklch(0.45 0.012 255);
+  --color-zinc-700: oklch(0.36 0.011 255);
+  --color-zinc-800: oklch(0.27 0.009 255);
+  --color-zinc-900: oklch(0.205 0.007 255);
+  --color-zinc-950: oklch(0.15 0.005 255);
 }
 
 @theme inline {
@@ -59,37 +59,38 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Dark theme — always applied via .dark on <html> */
+/* Dark theme — always applied via .dark on <html>.
+   Neutral graphite surfaces + a single crisp azure accent. */
 .dark {
   color-scheme: dark;
-  --background: oklch(0.155 0.018 275);
-  --foreground: oklch(0.97 0.006 275);
-  --card: oklch(0.19 0.022 275);
-  --card-foreground: oklch(0.97 0.006 275);
-  --popover: oklch(0.205 0.025 275);
-  --popover-foreground: oklch(0.97 0.006 275);
-  --primary: oklch(0.585 0.215 287);
+  --background: oklch(0.145 0.004 255);
+  --foreground: oklch(0.965 0.003 255);
+  --card: oklch(0.18 0.005 255);
+  --card-foreground: oklch(0.965 0.003 255);
+  --popover: oklch(0.205 0.006 255);
+  --popover-foreground: oklch(0.965 0.003 255);
+  --primary: oklch(0.6 0.165 250);
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.255 0.026 275);
-  --secondary-foreground: oklch(0.96 0.006 275);
-  --muted: oklch(0.24 0.022 275);
-  --muted-foreground: oklch(0.71 0.025 272);
-  --accent: oklch(0.265 0.035 280);
-  --accent-foreground: oklch(0.97 0.006 275);
-  --destructive: oklch(0.68 0.2 22);
-  --border: oklch(0.88 0.04 280 / 9%);
-  --input: oklch(0.88 0.04 280 / 14%);
-  --ring: oklch(0.66 0.19 287);
-  --brand-cyan: oklch(0.82 0.13 205);
-  --sidebar: oklch(0.135 0.018 275);
-  --sidebar-foreground: oklch(0.97 0.006 275);
-  --sidebar-primary: oklch(0.585 0.215 287);
+  --secondary: oklch(0.235 0.006 255);
+  --secondary-foreground: oklch(0.95 0.003 255);
+  --muted: oklch(0.23 0.006 255);
+  --muted-foreground: oklch(0.7 0.01 255);
+  --accent: oklch(0.25 0.008 255);
+  --accent-foreground: oklch(0.965 0.003 255);
+  --destructive: oklch(0.68 0.19 24);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.66 0.15 250);
+  --brand-cyan: oklch(0.8 0.12 210);
+  --sidebar: oklch(0.125 0.004 255);
+  --sidebar-foreground: oklch(0.965 0.003 255);
+  --sidebar-primary: oklch(0.6 0.165 250);
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.22 0.028 280);
-  --sidebar-accent-foreground: oklch(0.97 0.006 275);
-  --sidebar-border: oklch(0.88 0.04 280 / 8%);
-  --sidebar-ring: oklch(0.66 0.19 287);
-  --radius: 0.7rem;
+  --sidebar-accent: oklch(0.2 0.006 255);
+  --sidebar-accent-foreground: oklch(0.965 0.003 255);
+  --sidebar-border: oklch(1 0 0 / 7%);
+  --sidebar-ring: oklch(0.66 0.15 250);
+  --radius: 0.625rem;
 }
 
 html {
@@ -102,14 +103,14 @@ body {
 }
 
 ::selection {
-  background: oklch(0.585 0.215 287 / 40%);
+  background: oklch(0.6 0.165 250 / 40%);
   color: white;
 }
 
 /* Custom scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: oklch(0.36 0.03 275) transparent;
+  scrollbar-color: oklch(0.34 0.008 255) transparent;
 }
 ::-webkit-scrollbar {
   width: 8px;
@@ -119,13 +120,13 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.34 0.03 275);
+  background: oklch(0.32 0.008 255);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.45 0.05 280);
+  background: oklch(0.42 0.01 255);
   background-clip: padding-box;
 }
 
@@ -142,83 +143,103 @@ body {
   h1 {
     @apply font-semibold;
   }
+
+  /* Native <select> dropdown lists — the OS draws these, so give the
+     options explicit dark colors (otherwise light text on a white list). */
+  select {
+    color-scheme: dark;
+  }
+  select option,
+  select optgroup {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
+  select option:checked {
+    background-color: oklch(0.6 0.165 250 / 35%);
+    color: var(--foreground);
+  }
+  select option:disabled {
+    color: var(--muted-foreground);
+  }
 }
 
-/* App canvas — soft ambient glow behind page content */
+/* App canvas — barely-there light from the top, keeps things crisp */
 .app-canvas {
   background:
-    radial-gradient(1200px 600px at 100% -10%, oklch(0.585 0.215 287 / 9%), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, oklch(0.82 0.13 205 / 6%), transparent 60%),
+    radial-gradient(1100px 480px at 85% -15%, oklch(0.6 0.165 250 / 5%), transparent 65%),
     var(--background);
 }
 
 /* Login canvas */
 .auth-canvas {
   background:
-    radial-gradient(700px 420px at 50% -5%, oklch(0.585 0.215 287 / 22%), transparent 70%),
-    radial-gradient(600px 400px at 85% 100%, oklch(0.82 0.13 205 / 12%), transparent 70%),
+    radial-gradient(640px 380px at 50% -5%, oklch(0.6 0.165 250 / 14%), transparent 70%),
     var(--background);
 }
 .auth-grid {
   background-image:
-    linear-gradient(oklch(1 0 0 / 3.5%) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(1 0 0 / 3.5%) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    linear-gradient(oklch(1 0 0 / 3%) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(1 0 0 / 3%) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse at center, black 25%, transparent 70%);
 }
 
-/* Shared surface treatment */
+/* Shared surface treatment — hairline border, soft depth */
 @utility surface {
   background:
-    linear-gradient(180deg, oklch(1 0 0 / 2.5%), transparent 40%),
+    linear-gradient(180deg, oklch(1 0 0 / 2%), transparent 50%),
     var(--card);
   box-shadow:
-    0 0 0 1px oklch(0.88 0.04 280 / 8%),
-    0 1px 0 0 oklch(1 0 0 / 4%) inset,
-    0 12px 32px -16px oklch(0 0 0 / 55%);
+    0 0 0 1px oklch(1 0 0 / 7%),
+    0 1px 0 0 oklch(1 0 0 / 3%) inset,
+    0 8px 24px -14px oklch(0 0 0 / 60%);
 }
 
 /* Legacy utility classes — keep pages working without full rewrites */
 @layer components {
   .field-label {
-    @apply block text-xs font-medium text-muted-foreground mb-1.5 tracking-wide;
+    @apply block text-xs font-medium text-muted-foreground mb-1.5;
   }
 
   .field-input {
-    @apply h-9 w-full rounded-lg border border-input bg-input/20 px-3 py-2 text-sm
-           text-foreground placeholder:text-muted-foreground/70 shadow-xs
-           outline-none hover:border-foreground/20
-           focus-visible:border-ring focus-visible:bg-input/30 focus-visible:ring-3 focus-visible:ring-ring/30
-           disabled:opacity-50 disabled:cursor-not-allowed transition-all;
+    @apply h-9 w-full rounded-lg border border-input bg-white/[0.03] px-3 py-2 text-sm
+           text-foreground placeholder:text-muted-foreground/60
+           outline-none hover:border-white/20
+           focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25
+           disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
   }
 
+  /* Selects: custom chevron, solid surface so the closed control is readable */
   select.field-input {
-    @apply bg-card;
+    @apply appearance-none bg-card pr-9 cursor-pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 16px 16px;
   }
 
   .field-textarea {
-    @apply h-auto w-full rounded-lg border border-input bg-input/20 px-3 py-2 text-sm
-           text-foreground placeholder:text-muted-foreground/70 shadow-xs
-           outline-none hover:border-foreground/20
-           focus-visible:border-ring focus-visible:bg-input/30 focus-visible:ring-3 focus-visible:ring-ring/30
-           disabled:opacity-50 disabled:cursor-not-allowed transition-all resize-none;
+    @apply h-auto w-full rounded-lg border border-input bg-white/[0.03] px-3 py-2 text-sm
+           text-foreground placeholder:text-muted-foreground/60
+           outline-none hover:border-white/20
+           focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25
+           disabled:opacity-50 disabled:cursor-not-allowed transition-colors resize-none;
   }
 
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2
-           text-primary-foreground font-medium rounded-lg px-4 py-2 text-sm
-           bg-linear-to-b from-[oklch(0.64_0.21_287)] to-[oklch(0.55_0.22_285)]
-           shadow-[inset_0_1px_0_0_rgb(255_255_255/0.18),0_6px_18px_-8px_oklch(0.585_0.215_287/0.8)]
-           hover:brightness-110 active:brightness-95
-           transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100 cursor-pointer;
+           bg-primary text-primary-foreground font-medium rounded-lg px-4 py-2 text-sm
+           shadow-[inset_0_1px_0_0_rgb(255_255_255/0.14),0_1px_2px_0_rgb(0_0_0/0.4)]
+           hover:bg-[oklch(0.65_0.16_250)] active:bg-[oklch(0.56_0.165_250)]
+           transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary cursor-pointer;
   }
 
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2
            bg-secondary hover:bg-accent text-secondary-foreground
-           ring-1 ring-inset ring-foreground/8
+           ring-1 ring-inset ring-white/8
            font-medium rounded-lg px-4 py-2 text-sm
-           transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
+           transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
   }
 
   .btn-ghost {
@@ -232,11 +253,11 @@ body {
   }
 
   .tab-btn {
-    @apply px-4 py-2 text-sm font-medium rounded-lg transition-all cursor-pointer;
+    @apply px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer;
   }
 
   .tab-btn-active {
-    @apply bg-primary/15 text-foreground ring-1 ring-inset ring-primary/35 shadow-[0_0_20px_-8px_oklch(0.585_0.215_287/0.7)];
+    @apply bg-white/[0.07] text-foreground ring-1 ring-inset ring-white/10;
   }
 
   .tab-btn-inactive {

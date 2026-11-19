@@ -36,5 +36,5 @@ export async function login(formData: FormData): Promise<{ error: string } | voi
     path: "/",
   });
 
-  redirect(user.role === "admin" ? "/" : "/applications");
+  redirect(user.role === "admin" || user.role === "super_admin" ? "/" : "/applications");
 }

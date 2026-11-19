@@ -263,7 +263,7 @@ export default function ApplicationsPage() {
     Promise.all([fetch("/api/me"), fetch("/api/profiles?includeInactive=1")]).then(async ([meRes, profRes]) => {
       if (meRes.ok) {
         const me = await meRes.json();
-        const admin = me.role === "admin";
+        const admin = me.role === "admin" || me.role === "super_admin";
         setIsAdmin(admin);
         if (admin) {
           fetch("/api/team")

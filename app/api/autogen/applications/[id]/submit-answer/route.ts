@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireBearerAuth } from "@/lib/auth";
+import { canAccessApplication, canUseTemplate } from "@/lib/access";
 import { extractJsonAnswer } from "@/lib/promptBuilder";
 import { uploadResumeToDrive } from "@/lib/googleDrive";
 import { buildResumeFilename } from "@/lib/resumeFilename";
@@ -32,6 +33,8 @@ export async function POST(
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+  if (!(await canAccessApplication(session, id)))
+    return NextResponse.json({ status: "Error", detail: "Application not found." });
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -51,6 +54,8 @@ export async function POST(
     const effectiveTemplateId = app.template_id || fallbackTemplateId;
     if (!effectiveTemplateId)
       return NextResponse.json({ status: "Error", detail: "Application has no template assigned." });
+    if (!app.template_id && !(await canUseTemplate(session, effectiveTemplateId)))
+      return NextResponse.json({ status: "Error", detail: "Template not found." });
 
     let jsonData: Record<string, unknown>;
     try {

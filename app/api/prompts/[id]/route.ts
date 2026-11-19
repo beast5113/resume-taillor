@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
+import { canManageOwned } from "@/lib/access";
+
+async function guard(id: string) {
+  const session = await requireSession();
+  if (!session || !(await canManageOwned(session, "prompts", id))) return null;
+  return session;
+}
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!(await guard(id))) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   let name: string | undefined;
   let content: string | undefined;
   let is_default: boolean | undefined;
@@ -23,11 +32,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   if (is_default === true) {
-    const { error: clearError } = await supabase
+    // Default is per owner: only clear the other default prompt of the same owner.
+    const { data: own } = await supabase.from("prompts").select("owner_id").eq("id", id).maybeSingle();
+    let clear = supabase
       .from("prompts")
       .update({ is_default: false })
       .eq("is_default", true)
       .neq("id", id);
+    clear = own?.owner_id ? clear.eq("owner_id", own.owner_id) : clear.is("owner_id", null);
+    const { error: clearError } = await clear;
     if (clearError) return NextResponse.json({ message: clearError.message }, { status: 500 });
   }
 
@@ -44,6 +57,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!(await guard(id))) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 
   const { data: prompt } = await supabase
     .from("prompts")

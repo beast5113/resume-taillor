@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
+import { isAdminRole, scopeApps, applicationFilter, visibleProfileIds } from "@/lib/access";
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -18,6 +20,10 @@ function isDice(job_url: string | null, job_board: string | null): boolean {
 }
 
 export async function GET() {
+  const session = await requireSession();
+  if (!session || !isAdminRole(session)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+
+  const appScope = await applicationFilter(session);
   const jstNow = toJstShifted(new Date());
 
   // Daily bid counts — current week (Sun-Sat) in JST, summed across all profiles
@@ -30,11 +36,14 @@ export async function GET() {
   const weekStartUtc = fromJstShifted(jstWeekStart);
   const weekEndUtc = fromJstShifted(jstWeekEnd);
 
-  const { data: apps, error } = await supabase
-    .from("applications")
-    .select("id, created_at, job_url, job_board")
-    .gte("created_at", weekStartUtc.toISOString())
-    .lt("created_at", weekEndUtc.toISOString());
+  const { data: apps, error } = await scopeApps(
+    supabase
+      .from("applications")
+      .select("id, created_at, job_url, job_board")
+      .gte("created_at", weekStartUtc.toISOString())
+      .lt("created_at", weekEndUtc.toISOString()),
+    appScope
+  );
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
 
@@ -67,12 +76,16 @@ export async function GET() {
     const PAGE_SIZE = 1000;
     let from = 0;
     for (;;) {
-      const { data: rows, error: stageError } = await supabase
-        .from("applications")
-        .select("profile_id, pipeline_status")
-        .in("pipeline_status", STAGE_STATUSES)
-        .not("profile_id", "is", null)
-        .range(from, from + PAGE_SIZE - 1);
+      const { data: rows, error: stageError } = await scopeApps(
+        supabase
+          .from("applications")
+          .select("profile_id, pipeline_status")
+          .in("pipeline_status", STAGE_STATUSES)
+          .not("profile_id", "is", null)
+          .order("id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1),
+        appScope
+      );
 
       if (stageError) return NextResponse.json({ message: stageError.message }, { status: 500 });
       if (!rows || rows.length === 0) break;
@@ -90,9 +103,10 @@ export async function GET() {
     }
   }
 
-  const { data: profiles, error: profilesError } = await supabase
-    .from("profiles")
-    .select("id, name, is_active");
+  const visibleIds = await visibleProfileIds(session);
+  let profilesQuery = supabase.from("profiles").select("id, name, is_active");
+  if (visibleIds !== null) profilesQuery = profilesQuery.in("id", visibleIds.length ? visibleIds : ["00000000-0000-0000-0000-000000000000"]);
+  const { data: profiles, error: profilesError } = await profilesQuery;
 
   if (profilesError) return NextResponse.json({ message: profilesError.message }, { status: 500 });
 

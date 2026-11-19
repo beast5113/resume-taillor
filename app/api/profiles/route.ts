@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireAnyAuth } from "@/lib/auth";
+import { isAdminRole, visibleProfileIds } from "@/lib/access";
 
 export async function GET(request: NextRequest) {
   const session = await requireAnyAuth(request);
@@ -20,13 +21,9 @@ export async function GET(request: NextRequest) {
 
   if (!includeInactive) query = query.eq("is_active", true);
 
-  if (session.role === "assistant") {
-    const { data: assignments } = await supabase
-      .from("profile_assignments")
-      .select("profile_id")
-      .eq("user_id", session.userId);
-
-    const ids = (assignments ?? []).map((a) => a.profile_id);
+  // super_admin: all · admin: own profiles · assistant: assigned profiles
+  const ids = await visibleProfileIds(session);
+  if (ids !== null) {
     if (ids.length === 0) return NextResponse.json([]);
     query = query.in("id", ids);
   }
@@ -38,7 +35,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const session = await requireAnyAuth(request);
-  if (!session || session.role !== "admin")
+  if (!session || !isAdminRole(session))
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 
   let name: string;
@@ -70,6 +67,7 @@ export async function POST(request: NextRequest) {
     .insert({
       name, first_name, last_name,
       profile_basic: profile_basic?.trim() || null,
+      owner_id: session.userId,
     })
     .select("id, name, first_name, last_name, default_template_id, profile_basic, is_active, created_at, updated_at")
     .single();

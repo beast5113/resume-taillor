@@ -5,6 +5,7 @@ const ADMIN_ONLY = [
   "/dashboard", "/prompts", "/templates",
   "/profile", "/team", "/builder", "/batch-builder",
 ];
+const SUPER_ADMIN_ONLY = ["/team"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -27,6 +28,10 @@ export async function proxy(request: NextRequest) {
 
   if (session.role === "assistant" && ADMIN_ONLY.some((p) => pathname.startsWith(p))) {
     return NextResponse.redirect(new URL("/applications", request.url));
+  }
+
+  if (session.role !== "super_admin" && SUPER_ADMIN_ONLY.some((p) => pathname.startsWith(p))) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();

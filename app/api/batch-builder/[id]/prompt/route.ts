@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
+import { canAccessApplication, canUseTemplate } from "@/lib/access";
 import { extractTemplateVariables } from "@/lib/docxTemplater";
 import { resolveSystemPrompt } from "@/lib/promptResolution";
 import { buildUserPrompt } from "@/lib/promptBuilder";
@@ -18,6 +19,11 @@ export async function GET(
 
   if (!templateId)
     return NextResponse.json({ message: "templateId query param is required" }, { status: 400 });
+
+  if (!(await canAccessApplication(session, id)))
+    return NextResponse.json({ message: "Application not found" }, { status: 404 });
+  if (!(await canUseTemplate(session, templateId)))
+    return NextResponse.json({ message: "Template not found" }, { status: 404 });
 
   const { data: app } = await supabase
     .from("applications")

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireBearerAuth } from "@/lib/auth";
+import { scopeApps, applicationFilter } from "@/lib/access";
 
 const MAX_CANDIDATES = 200;
 
@@ -29,8 +30,8 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(MAX_CANDIDATES);
 
-  if (session.role === "assistant") query = query.eq("created_by", session.userId);
-  else if (bidderId) query = query.eq("created_by", bidderId);
+  query = scopeApps(query, await applicationFilter(session));
+  if (session.role !== "assistant" && bidderId) query = query.eq("created_by", bidderId);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });

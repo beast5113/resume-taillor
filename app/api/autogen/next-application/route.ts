@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireBearerAuth } from "@/lib/auth";
+import { scopeApps, applicationFilter, canUseTemplate } from "@/lib/access";
 import { assembleFullPrompt } from "@/lib/promptBuilder";
 import { tryClaimRow, releaseClaim, staleThresholdIso } from "@/lib/autogenClaim";
 
@@ -27,7 +28,9 @@ export async function GET(request: NextRequest) {
   const session = await requireBearerAuth(request);
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
-  const fallbackTemplateId = request.nextUrl.searchParams.get("templateId")?.trim() || "";
+  let fallbackTemplateId = request.nextUrl.searchParams.get("templateId")?.trim() || "";
+  // A fallback template outside the caller's scope is ignored.
+  if (fallbackTemplateId && !(await canUseTemplate(session, fallbackTemplateId))) fallbackTemplateId = "";
   const bidderId = request.nextUrl.searchParams.get("bidderId")?.trim() || "";
 
   let query = supabase
@@ -42,8 +45,8 @@ export async function GET(request: NextRequest) {
   // are claimable; with one, template-less applications fall back to it.
   if (!fallbackTemplateId) query = query.not("template_id", "is", null);
 
-  if (session.role === "assistant") query = query.eq("created_by", session.userId);
-  else if (bidderId) query = query.eq("created_by", bidderId);
+  query = scopeApps(query, await applicationFilter(session));
+  if (session.role !== "assistant" && bidderId) query = query.eq("created_by", bidderId);
 
   const { data: candidates, error } = await query;
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });

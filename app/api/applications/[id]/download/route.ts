@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
+import { canAccessApplication } from "@/lib/access";
 import { downloadResumeFromDrive } from "@/lib/googleDrive";
 
 export async function GET(
@@ -7,6 +9,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const session = await requireSession();
+  if (!session || !(await canAccessApplication(session, id))) return NextResponse.json({ message: "Not found" }, { status: 404 });
   const { data, error } = await supabase
     .from("applications")
     .select("google_drive_file_id, role, company_name, status")

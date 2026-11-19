@@ -29,7 +29,7 @@ export default function LoginPage() {
         {/* Brand */}
         <div className="flex flex-col items-center text-center mb-8">
           <div className="relative mb-5">
-            <div className="absolute inset-0 -z-10 rounded-full bg-primary/40 blur-2xl" />
+            <div className="absolute inset-0 -z-10 rounded-full bg-primary/25 blur-2xl" />
             <BrandMark size={60} />
           </div>
           <BrandWordmark className="text-3xl" />

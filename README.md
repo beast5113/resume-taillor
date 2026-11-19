@@ -140,6 +140,7 @@ cp .env.example .env
      where table_schema = 'public' order by 1;
      ```
      You should see all 7 tables listed above.
+   - **Then run every file in [`migrations/`](./migrations) in order** (SQL Editor), e.g. `001_super_admin_and_ownership.sql` — adds the `super_admin` role and per-admin ownership (`owner_id`) of prompts, templates and profiles.
 3. **Create the storage bucket**: go to **Storage** in the dashboard and create a
    new bucket named exactly:
    ```
@@ -173,9 +174,16 @@ bcrypt-hashed) — copy it into the Supabase **SQL Editor** and run it. After th
 log in at `/login` with that email/password, and use the **Team** page in the app
 to add further admins/assistants without touching SQL again.
 
-Roles: `admin` (full access) vs `assistant` (restricted — assistants only see
-applications/templates/profiles assigned to them; see `proxy.ts` and
-`app/api/team` for the exact rules).
+Roles (enforced server-side in [`lib/access.ts`](./lib/access.ts)):
+
+| Role | Can see / manage | Accounts (Team) |
+|---|---|---|
+| `super_admin` | Everything | Yes — the only role that can |
+| `admin` | Only their **own** prompts, templates, profiles, and applications on their profiles | No |
+| `assistant` | Profiles assigned to them, applications they created | No |
+
+Each admin has their own default prompt. Templates a super admin creates for an
+admin's profile are owned by that admin.
 
 ## Step 3 – Google Drive setup
 

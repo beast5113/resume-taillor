@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
+import { isAdminRole, accessibleApplicationIds, visibleTeamUserIds } from "@/lib/access";
 import { deleteFileFromDrive } from "@/lib/googleDrive";
 import { STATUSES_THAT_CLEAR_RESUME, resumeClearingFields } from "@/lib/applicationResumeCleanup";
 
 const ALLOWED_STATUSES = ["pending", "completed", "failed"];
 
 export async function PATCH(request: NextRequest) {
-  const body = await request.json();
-  const { ids, pipeline_status, status, created_by } = body;
+  const session = await requireSession();
+  if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
-  if (!Array.isArray(ids) || ids.length === 0)
+  const body = await request.json();
+  const { pipeline_status, status, created_by } = body;
+
+  if (!Array.isArray(body.ids) || body.ids.length === 0)
     return NextResponse.json({ message: "ids array is required" }, { status: 400 });
+
+  // Silently drop ids outside the caller's scope.
+  const ids = await accessibleApplicationIds(session, body.ids as string[]);
+  if (ids.length === 0) return NextResponse.json({ updated: 0 });
 
   if (!pipeline_status && !status && !created_by)
     return NextResponse.json({ message: "pipeline_status, status, or created_by is required" }, { status: 400 });
@@ -20,9 +28,11 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ message: `status must be one of: ${ALLOWED_STATUSES.join(", ")}` }, { status: 400 });
 
   if (created_by) {
-    const session = await requireSession();
-    if (!session || session.role !== "admin")
+    if (!isAdminRole(session))
       return NextResponse.json({ message: "Only admins can reassign the bidder" }, { status: 403 });
+    const allowed = await visibleTeamUserIds(session);
+    if (allowed !== null && !allowed.includes(created_by))
+      return NextResponse.json({ message: "You can't assign to that bidder" }, { status: 403 });
   }
 
   const updatePayload: Record<string, string | null> = {};
@@ -44,11 +54,15 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  const ids = body?.ids;
+  const session = await requireSession();
+  if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
-  if (!Array.isArray(ids) || ids.length === 0)
+  const body = await request.json().catch(() => null);
+  if (!Array.isArray(body?.ids) || body.ids.length === 0)
     return NextResponse.json({ message: "ids array is required" }, { status: 400 });
+
+  const ids = await accessibleApplicationIds(session, body.ids as string[]);
+  if (ids.length === 0) return NextResponse.json({ deleted: 0 });
 
   const { data: apps } = await supabase
     .from("applications")

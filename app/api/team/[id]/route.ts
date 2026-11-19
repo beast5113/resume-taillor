@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
+import { isSuperAdmin } from "@/lib/access";
 import bcrypt from "bcryptjs";
 
+const ROLES = ["super_admin", "admin", "assistant"];
+
+/** Account management is super-admin only. */
 async function requireAdmin() {
   const session = await requireSession();
-  if (!session || session.role !== "admin") return null;
+  if (!session || !isSuperAdmin(session)) return null;
   return session;
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireAdmin();
   if (!session) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ message: "Only the super admin can manage accounts" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -21,7 +25,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   if (body.name?.trim()) updates.name = body.name.trim();
   if (body.email?.trim()) updates.email = body.email.toLowerCase().trim();
-  if (body.role && ["admin", "assistant"].includes(body.role)) updates.role = body.role;
+  if (body.role && ROLES.includes(body.role)) {
+    if (id === session.userId && body.role !== "super_admin") {
+      return NextResponse.json({ message: "You can't remove your own super admin role." }, { status: 400 });
+    }
+    updates.role = body.role;
+  }
   if (body.password?.trim()) updates.password_hash = await bcrypt.hash(body.password.trim(), 12);
   if (typeof body.is_active === "boolean") {
     if (!body.is_active && id === session.userId) {
@@ -51,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireAdmin();
-  if (!session) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!session) return NextResponse.json({ message: "Only the super admin can manage accounts" }, { status: 403 });
 
   const { id } = await params;
 

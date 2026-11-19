@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireAnyAuth } from "@/lib/auth";
+import { scopeApps, applicationFilter } from "@/lib/access";
 
 export async function GET(request: NextRequest) {
   const session = await requireAnyAuth(request);
@@ -29,6 +30,8 @@ export async function GET(request: NextRequest) {
   if (profile_id) {
     query = query.eq("profile_id", profile_id);
   }
+
+  query = scopeApps(query, await applicationFilter(session));
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });

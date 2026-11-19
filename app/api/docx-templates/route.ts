@@ -2,26 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { extractTemplateVariables } from "@/lib/docxTemplater";
 import { requireSession } from "@/lib/auth";
+import { isAdminRole, isSuperAdmin, visibleTemplateIds, canManageOwned, profileOwnerId } from "@/lib/access";
 
 const COVER_LETTER_VARS = new Set(["date", "letter"]);
 
 export async function GET() {
   const session = await requireSession();
+  if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   let query = supabase
     .from("docx_templates")
     .select("id, name, storage_path, variables, template_type, profile_id, prompt_id, notes, company_name_hyperlink, created_at, updated_at")
     .order("created_at", { ascending: true });
 
-  if (session?.role === "assistant") {
-    const { data: assignments } = await supabase
-      .from("profile_assignments")
-      .select("profile_id")
-      .eq("user_id", session.userId);
-
-    const profileIds = (assignments ?? []).map((a) => a.profile_id);
-    if (profileIds.length === 0) return NextResponse.json([]);
-    query = query.in("profile_id", profileIds);
+  // super_admin: all · admin: own templates · assistant: templates of assigned profiles
+  const ids = await visibleTemplateIds(session);
+  if (ids !== null) {
+    if (ids.length === 0) return NextResponse.json([]);
+    query = query.in("id", ids);
   }
 
   const { data, error } = await query;
@@ -30,6 +28,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await requireSession();
+  if (!session || !isAdminRole(session))
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+
   const formData = await request.formData().catch(() => null);
   if (!formData) return NextResponse.json({ message: "Invalid form data" }, { status: 400 });
 
@@ -47,6 +49,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Only .docx files are supported" }, { status: 400 });
   if (!["resume", "cover_letter"].includes(template_type))
     return NextResponse.json({ message: "template_type must be resume or cover_letter" }, { status: 400 });
+
+  if (profile_id && !(await canManageOwned(session, "profiles", profile_id)))
+    return NextResponse.json({ message: "You can only use your own profiles" }, { status: 403 });
+  if (prompt_id && !(await canManageOwned(session, "prompts", prompt_id)))
+    return NextResponse.json({ message: "You can only use your own prompts" }, { status: 403 });
+
+  // A template belongs to its profile's owner (so a super admin creating a
+  // template for an admin's profile hands it to that admin); otherwise the caller.
+  const owner_id =
+    (profile_id && isSuperAdmin(session) ? await profileOwnerId(profile_id) : null) ?? session.userId;
 
   const arrayBuffer = await file.arrayBuffer();
   const fileBuffer = Buffer.from(arrayBuffer);
@@ -83,7 +95,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("docx_templates")
-    .insert({ name, storage_path: storagePath, variables, template_type, profile_id: profile_id || null, prompt_id, notes, company_name_hyperlink })
+    .insert({ name, storage_path: storagePath, variables, template_type, profile_id: profile_id || null, prompt_id, notes, company_name_hyperlink, owner_id })
     .select()
     .single();
 

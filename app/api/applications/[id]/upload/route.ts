@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { uploadResumeToDrive } from "@/lib/googleDrive";
 import { buildResumeFilename } from "@/lib/resumeFilename";
 import { requireSession } from "@/lib/auth";
+import { canAccessApplication, canSeeProfile } from "@/lib/access";
 
 export async function POST(
   request: NextRequest,
@@ -12,6 +13,8 @@ export async function POST(
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+  if (!(await canAccessApplication(session, id)))
+    return NextResponse.json({ message: "Application not found" }, { status: 404 });
 
   const { data: app } = await supabase
     .from("applications")
@@ -33,6 +36,8 @@ export async function POST(
 
   if (!file) return NextResponse.json({ message: "file is required" }, { status: 400 });
   if (!profileId) return NextResponse.json({ message: "profileId is required" }, { status: 400 });
+  if (!(await canSeeProfile(session, profileId)))
+    return NextResponse.json({ message: "Profile not found" }, { status: 404 });
   if (!file.name.toLowerCase().endsWith(".docx"))
     return NextResponse.json({ message: "Only .docx files are accepted" }, { status: 400 });
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireBearerAuth, requireSession } from "@/lib/auth";
+import { canAccessApplication } from "@/lib/access";
 
 /** Job/resume context for one application, keyed by the human-readable seq
     shown in the UI (not the uuid id). Called by the Applications page (session
@@ -26,7 +27,7 @@ export async function GET(
     .single();
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
-  if (!data) return NextResponse.json({ message: "Not found" }, { status: 404 });
+  if (!data || !(await canAccessApplication(session, data.id))) return NextResponse.json({ message: "Not found" }, { status: 404 });
 
   const { profiles, ...application } = data;
   const profile = profiles as { profile_basic: string | null } | null;

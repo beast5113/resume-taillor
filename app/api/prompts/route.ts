@@ -1,17 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
+import { isAdminRole, scopeOwned } from "@/lib/access";
 
 export async function GET() {
-  const { data, error } = await supabase
-    .from("prompts")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const session = await requireSession();
+  if (!session || !isAdminRole(session)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+
+  const query = scopeOwned(
+    session,
+    supabase.from("prompts").select("*").order("created_at", { ascending: false })
+  );
+  const { data, error } = await query;
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
 
 export async function POST(request: NextRequest) {
+  const session = await requireSession();
+  if (!session || !isAdminRole(session)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+
   let name: string;
   let content: string;
 
@@ -27,7 +36,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("prompts")
-    .insert({ name: name.trim(), content: content ?? "" })
+    .insert({ name: name.trim(), content: content ?? "", owner_id: session.userId })
     .select()
     .single();
 

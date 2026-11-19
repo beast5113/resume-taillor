@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
+import { canAccessApplication } from "@/lib/access";
 import { deleteFileFromDrive } from "@/lib/googleDrive";
 import { STATUSES_THAT_CLEAR_RESUME, resumeClearingFields } from "@/lib/applicationResumeCleanup";
 
@@ -8,6 +10,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const session = await requireSession();
+  if (!session || !(await canAccessApplication(session, id))) return NextResponse.json({ message: "Not found" }, { status: 404 });
   const { data, error } = await supabase
     .from("applications")
     .select("*")
@@ -24,6 +28,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const session = await requireSession();
+  if (!session || !(await canAccessApplication(session, id))) return NextResponse.json({ message: "Not found" }, { status: 404 });
   const body = await request.json();
 
   const allowed = [
@@ -58,6 +64,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const session = await requireSession();
+  if (!session || !(await canAccessApplication(session, id))) return NextResponse.json({ message: "Not found" }, { status: 404 });
 
   const { data: app } = await supabase
     .from("applications")

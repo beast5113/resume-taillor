@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireAnyAuth } from "@/lib/auth";
+import { visibleTemplateIds } from "@/lib/access";
 
 export async function GET(request: NextRequest) {
   const session = await requireAnyAuth(request);
@@ -11,15 +12,10 @@ export async function GET(request: NextRequest) {
     .select("id, name")
     .order("name", { ascending: true });
 
-  if (session.role === "assistant") {
-    const { data: assignments } = await supabase
-      .from("profile_assignments")
-      .select("profile_id")
-      .eq("user_id", session.userId);
-
-    const profileIds = (assignments ?? []).map((a) => a.profile_id);
-    if (profileIds.length === 0) return NextResponse.json([]);
-    query = query.in("profile_id", profileIds);
+  const ids = await visibleTemplateIds(session);
+  if (ids !== null) {
+    if (ids.length === 0) return NextResponse.json([]);
+    query = query.in("id", ids);
   }
 
   const profileId = request.nextUrl.searchParams.get("profile_id");

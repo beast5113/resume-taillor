@@ -16,7 +16,7 @@ interface TeamUser {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "assistant";
+  role: "super_admin" | "admin" | "assistant";
   is_active: boolean;
   created_at: string;
 }
@@ -24,7 +24,7 @@ interface TeamUser {
 interface Profile { id: string; name: string; }
 interface Assignment { id: string; profile_id: string; user_id: string; }
 
-type FormState = { name: string; email: string; password: string; role: "admin" | "assistant" };
+type FormState = { name: string; email: string; password: string; role: "super_admin" | "admin" | "assistant" };
 const EMPTY_FORM: FormState = { name: "", email: "", password: "", role: "assistant" };
 
 function formatDate(iso: string) {
@@ -150,7 +150,7 @@ export default function TeamPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editFields, setEditFields] = useState<{ name: string; email: string; role: "admin" | "assistant"; password: string }>({
+  const [editFields, setEditFields] = useState<{ name: string; email: string; role: "super_admin" | "admin" | "assistant"; password: string }>({
     name: "", email: "", role: "assistant", password: "",
   });
 
@@ -324,16 +324,17 @@ export default function TeamPage() {
                       </td>
                       <td className="px-4 py-3.5">
                         {editingId === m.id ? (
-                          <Select value={editFields.role} onValueChange={(v) => v && setEditFields((f) => ({ ...f, role: v as "admin" | "assistant" }))}>
+                          <Select value={editFields.role} onValueChange={(v) => v && setEditFields((f) => ({ ...f, role: v as "super_admin" | "admin" | "assistant" }))}>
                             <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="super_admin" className="text-xs">Super Admin</SelectItem>
                               <SelectItem value="admin" className="text-xs">Admin</SelectItem>
                               <SelectItem value="assistant" className="text-xs">Assistant</SelectItem>
                             </SelectContent>
                           </Select>
                         ) : (
-                          <Badge variant={m.role === "admin" ? "default" : "secondary"} className="capitalize text-xs">
-                            {m.role}
+                          <Badge variant={m.role === "assistant" ? "secondary" : "default"} className="capitalize text-xs">
+                            {m.role.replace("_", " ")}
                           </Badge>
                         )}
                       </td>
@@ -441,11 +442,12 @@ export default function TeamPage() {
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground block mb-1.5">Role</label>
-                <Select value={createForm.role} onValueChange={(v) => v && setCreateForm((f) => ({ ...f, role: v as "admin" | "assistant" }))}>
+                <Select value={createForm.role} onValueChange={(v) => v && setCreateForm((f) => ({ ...f, role: v as "super_admin" | "admin" | "assistant" }))}>
                   <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="assistant" className="text-xs">Assistant</SelectItem>
                     <SelectItem value="admin" className="text-xs">Admin</SelectItem>
+                    <SelectItem value="super_admin" className="text-xs">Super Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

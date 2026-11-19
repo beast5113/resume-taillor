@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
+import { canUseTemplate } from "@/lib/access";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const session = await requireSession();
+  if (!session || !(await canUseTemplate(session, id)))
+    return NextResponse.json({ message: "Template not found" }, { status: 404 });
 
   const { data: tpl, error } = await supabase
     .from("docx_templates")

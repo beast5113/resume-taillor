@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireAnyAuth } from "@/lib/auth";
+import { visibleTeamUserIds } from "@/lib/access";
 
 /**
  * Bidder (team_users) list for the AutoGen extension's "Assigned bidder"
@@ -8,7 +9,8 @@ import { requireAnyAuth } from "@/lib/auth";
  * admin web UI's team management page) - this one accepts the extension's
  * Bearer token and is readable by any authenticated user, not just admins.
  *
- * Admins see every active team member; an assistant only ever sees
+ * Super admins see every active team member, admins see themselves plus
+ * assistants (never other admins); an assistant only ever sees
  * themselves, since an assistant's applications are already always scoped to
  * their own created_by server-side regardless of any bidder filter they set.
  */
@@ -22,7 +24,9 @@ export async function GET(request: NextRequest) {
     .eq("is_active", true)
     .order("name", { ascending: true });
 
-  if (session.role === "assistant") query = query.eq("id", session.userId);
+  // super_admin: everyone · admin: self + assistants · assistant: self
+  const ids = await visibleTeamUserIds(session);
+  if (ids !== null) query = query.in("id", ids);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });

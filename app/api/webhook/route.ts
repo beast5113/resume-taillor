@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireBearerAuth } from "@/lib/auth";
+import { canSeeProfile, canUseTemplate } from "@/lib/access";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -57,7 +58,8 @@ export async function POST(request: NextRequest) {
       .eq("id", profile_id.trim())
       .eq("is_active", true)
       .maybeSingle();
-    if (profile) {
+    // A profile outside the caller's scope is treated like an unknown id.
+    if (profile && (await canSeeProfile(session, profile.id))) {
       resolvedProfileId = profile.id;
       profileDefaultTemplateId = profile.default_template_id ?? null;
     }
@@ -66,7 +68,8 @@ export async function POST(request: NextRequest) {
   // Extension-provided template wins; otherwise fall back to the profile's own
   // default template. Purely metadata for whoever renders this application's
   // resume later - nothing here triggers generation.
-  const storedTemplateId = template_id?.trim() || profileDefaultTemplateId;
+  let storedTemplateId = template_id?.trim() || profileDefaultTemplateId;
+  if (storedTemplateId && !(await canUseTemplate(session, storedTemplateId))) storedTemplateId = profileDefaultTemplateId;
 
   const { data: application, error: insertError } = await supabase
     .from("applications")

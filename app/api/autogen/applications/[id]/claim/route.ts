@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireBearerAuth } from "@/lib/auth";
+import { scopeApps, applicationFilter, canUseTemplate } from "@/lib/access";
 import { assembleFullPrompt } from "@/lib/promptBuilder";
 import { tryClaimRow, releaseClaim, STALE_CLAIM_MS } from "@/lib/autogenClaim";
 
@@ -25,7 +26,8 @@ export async function POST(
 
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
-  const fallbackTemplateId = String(body?.templateId ?? "").trim();
+  let fallbackTemplateId = String(body?.templateId ?? "").trim();
+  if (fallbackTemplateId && !(await canUseTemplate(session, fallbackTemplateId))) fallbackTemplateId = "";
 
   let query = supabase
     .from("applications")
@@ -33,7 +35,7 @@ export async function POST(
       "id, seq, role, company_name, job_description, profile_id, template_id, status, autogen_claimed_at, created_at, created_by"
     )
     .eq("id", id);
-  if (session.role === "assistant") query = query.eq("created_by", session.userId);
+  query = scopeApps(query, await applicationFilter(session));
 
   const { data: app } = await query.maybeSingle();
   if (!app) return NextResponse.json({ application: null, reason: "not_claimable" });

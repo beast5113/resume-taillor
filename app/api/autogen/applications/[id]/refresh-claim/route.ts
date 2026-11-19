@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireBearerAuth } from "@/lib/auth";
+import { canAccessApplication } from "@/lib/access";
 import { refreshClaim } from "@/lib/autogenClaim";
 
 /**
@@ -22,6 +23,7 @@ export async function POST(
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+  if (!(await canAccessApplication(session, id))) return NextResponse.json({ ok: false });
   const body = await request.json().catch(() => ({}));
   const claimedAt = String(body?.claimedAt ?? "");
   if (!claimedAt) return NextResponse.json({ message: "claimedAt is required" }, { status: 400 });

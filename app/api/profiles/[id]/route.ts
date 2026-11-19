@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
+import { canManageOwned } from "@/lib/access";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const session = await requireSession();
+  if (!session || !(await canManageOwned(session, "profiles", id)))
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ message: "Invalid request body" }, { status: 400 });
 
@@ -78,6 +83,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const session = await requireSession();
+  if (!session || !(await canManageOwned(session, "profiles", id)))
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 
   const { error } = await supabase.from("profiles").delete().eq("id", id);
 

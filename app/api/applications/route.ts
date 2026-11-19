@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
+import { scopeApps, applicationFilter } from "@/lib/access";
 
 const PAGE_SIZE = 20;
 
@@ -32,9 +33,9 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  if (session?.role === "assistant") {
-    query = query.eq("created_by", session.userId);
-  } else if (bidderId) {
+  // super_admin: all · admin: own profiles + own rows · assistant: own rows
+  query = scopeApps(query, await applicationFilter(session));
+  if (session.role !== "assistant" && bidderId) {
     query = query.eq("created_by", bidderId);
   }
 

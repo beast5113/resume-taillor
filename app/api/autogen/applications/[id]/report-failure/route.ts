@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireBearerAuth } from "@/lib/auth";
+import { canAccessApplication } from "@/lib/access";
 
 /**
  * Called once the extension has exhausted its own retry budget for an application.
@@ -16,6 +17,8 @@ export async function POST(
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+  if (!(await canAccessApplication(session, id)))
+    return NextResponse.json({ status: "Error", detail: "Application not found." });
   const body = await request.json().catch(() => ({}));
   const detail = String(body?.detail ?? "").slice(0, 2000);
 

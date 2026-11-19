@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
+import { canSeeProfile, canUseTemplate, accessibleApplicationIds } from "@/lib/access";
 
 /** Clones the selected applications' job (URL, role, company, JD, board,
  * salary) onto a different profile + template, so the same job can be applied
@@ -29,27 +30,23 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
   if (!profile) return NextResponse.json({ message: "Profile not found or inactive" }, { status: 400 });
 
-  if (session.role === "assistant") {
-    const { data: assignment } = await supabase
-      .from("profile_assignments")
-      .select("id")
-      .eq("user_id", session.userId)
-      .eq("profile_id", profileId)
-      .maybeSingle();
-    if (!assignment) return NextResponse.json({ message: "You are not assigned to this profile" }, { status: 403 });
-  }
+  if (!(await canSeeProfile(session, profileId)))
+    return NextResponse.json({ message: "You don't have access to this profile" }, { status: 403 });
 
   const { data: template } = await supabase
     .from("docx_templates")
     .select("id")
     .eq("id", templateId)
     .maybeSingle();
-  if (!template) return NextResponse.json({ message: "Template not found" }, { status: 400 });
+  if (!template || !(await canUseTemplate(session, templateId)))
+    return NextResponse.json({ message: "Template not found" }, { status: 400 });
+
+  const sourceIds = await accessibleApplicationIds(session, ids as string[]);
 
   const { data: sources, error: fetchError } = await supabase
     .from("applications")
     .select("job_url, role, company_name, job_description, job_board, salary")
-    .in("id", ids)
+    .in("id", sourceIds)
     .order("seq", { ascending: true });
   if (fetchError) return NextResponse.json({ message: fetchError.message }, { status: 500 });
   if (!sources?.length) return NextResponse.json({ message: "No matching applications" }, { status: 404 });

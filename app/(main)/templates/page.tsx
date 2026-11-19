@@ -14,11 +14,11 @@ function formatDate(iso: string) {
 
 function TypeBadge({ type }: { type: "resume" | "cover_letter" }) {
   return type === "cover_letter" ? (
-    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/15 border border-violet-500/30 text-violet-400 font-medium">
+    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/12 border border-teal-500/30 text-teal-300 font-medium">
       <Mail size={9} /> Cover Letter
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-400 font-medium">
+    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-sky-500/12 border border-sky-500/30 text-sky-300 font-medium">
       <FileText size={9} /> Resume
     </span>
   );
@@ -193,8 +193,8 @@ export default function TemplatesPage() {
                       className={`flex-1 py-2 px-3 rounded-lg border text-xs font-medium transition-colors ${
                         uploadType === t
                           ? t === "cover_letter"
-                            ? "bg-violet-500/20 border-violet-500/50 text-violet-300"
-                            : "bg-orange-500/20 border-orange-500/50 text-orange-300"
+                            ? "bg-teal-500/12 border-teal-500/50 text-teal-200"
+                            : "bg-sky-500/12 border-sky-500/50 text-sky-200"
                           : "border-border text-muted-foreground hover:bg-muted"
                       }`}
                     >
@@ -203,7 +203,7 @@ export default function TemplatesPage() {
                   ))}
                 </div>
                 {uploadType === "cover_letter" && (
-                  <p className="text-[11px] text-violet-400/80 mt-1.5">
+                  <p className="text-[11px] text-teal-300/80 mt-1.5">
                     Only <code className="bg-muted px-1 rounded">{"<<date>>"}</code> and <code className="bg-muted px-1 rounded">{"<<letter>>"}</code> placeholders are allowed.
                   </p>
                 )}

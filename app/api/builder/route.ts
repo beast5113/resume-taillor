@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
+import { isAdminRole, canUseTemplate } from "@/lib/access";
 import {
   renderDocxTemplate,
   renderDocxTemplateStructured,
@@ -9,6 +11,9 @@ import {
 } from "@/lib/docxTemplater";
 
 export async function POST(request: NextRequest) {
+  const session = await requireSession();
+  if (!session || !isAdminRole(session)) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+
   let templateId: string;
   let values: Record<string, unknown>;
 
@@ -22,6 +27,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "A DOCX template must be selected" }, { status: 400 });
   if (!values || typeof values !== "object" || Array.isArray(values))
     return NextResponse.json({ message: "values must be a JSON object" }, { status: 400 });
+
+  if (!(await canUseTemplate(session, templateId)))
+    return NextResponse.json({ message: "Template not found" }, { status: 404 });
 
   const { data: tpl, error: tplError } = await supabase
     .from("docx_templates")
