@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { login } from "./actions";
-import { FileText } from "lucide-react";
+import { ArrowRight, Lock, Mail } from "lucide-react";
+import { BrandMark, BrandWordmark } from "@/components/BrandMark";
 
 export default function LoginPage() {
   const [error, setError] = useState("");
@@ -21,54 +22,71 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="bg-card rounded-2xl ring-1 ring-foreground/10 p-8 w-full max-w-sm shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
-            <FileText size={18} className="text-primary-foreground" />
+    <div className="auth-canvas relative min-h-screen flex items-center justify-center p-4 overflow-hidden">
+      <div className="auth-grid pointer-events-none absolute inset-0" />
+
+      <div className="relative w-full max-w-sm animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+        {/* Brand */}
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="relative mb-5">
+            <div className="absolute inset-0 -z-10 rounded-full bg-primary/40 blur-2xl" />
+            <BrandMark size={60} />
           </div>
-          <div>
-            <h1 className="text-base font-semibold text-foreground leading-tight">AI Resume Tailor</h1>
-            <p className="text-xs text-muted-foreground">Sign in to your workspace</p>
-          </div>
+          <BrandWordmark className="text-3xl" />
+          <p className="mt-2 text-sm text-muted-foreground">Sign in to your workspace</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Email</label>
-            <input
-              name="email"
-              type="email"
-              required
-              autoFocus
-              autoComplete="email"
-              className="field-input"
-            />
-          </div>
+        <div className="surface rounded-2xl p-7 backdrop-blur-sm">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5">Email</label>
+              <div className="relative">
+                <Mail size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/70" />
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  autoFocus
+                  autoComplete="email"
+                  placeholder="you@company.com"
+                  className="field-input h-10 pl-9"
+                />
+              </div>
+            </div>
 
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Password</label>
-            <input
-              name="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              className="field-input"
-            />
-          </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5">Password</label>
+              <div className="relative">
+                <Lock size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/70" />
+                <input
+                  name="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  className="field-input h-10 pl-9"
+                />
+              </div>
+            </div>
 
-          {error && (
-            <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{error}</p>
-          )}
+            {error && (
+              <p className="text-xs text-destructive bg-destructive/10 ring-1 ring-inset ring-destructive/25 px-3 py-2 rounded-lg">{error}</p>
+            )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-9 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? "Signing in…" : "Sign In"}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary group w-full h-10 mt-2"
+            >
+              {loading ? "Signing in…" : "Sign In"}
+              {!loading && <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />}
+            </button>
+          </form>
+        </div>
+
+        <p className="mt-6 text-center text-[11px] text-muted-foreground/60">
+          © {new Date().getFullYear()} HexNinja · Private workspace
+        </p>
       </div>
     </div>
   );

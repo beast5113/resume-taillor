@@ -1,4 +1,4 @@
-# Resume Tailor
+# HexNinja
 
 Internal web app that generates ATS-tailored resumes (and cover letters) from a job
 description, using DOCX templates for formatting and Google Drive for delivering the

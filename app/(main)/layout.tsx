@@ -24,7 +24,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
   return (
     <div className="flex h-full overflow-hidden">
       <Sidebar role={role} userName={userName} />
-      <main className="flex-1 bg-background overflow-auto">
+      <main className="app-canvas flex-1 overflow-auto">
         {children}
       </main>
     </div>

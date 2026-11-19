@@ -638,8 +638,8 @@ export default function ApplicationsPage() {
                 <Tooltip.Positioner sideOffset={6}>
                   <Tooltip.Popup className="z-50 rounded-md bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10 max-w-64">
                     {extensionReady
-                      ? "The Resume Tailor browser extension is active on this page — job links open through it and carry the application's resume context into the tab."
-                      : "The Resume Tailor browser extension wasn't detected on this page. Job links will open as plain browser tabs instead, with no resume context sent along."}
+                      ? "The HexNinja browser extension is active on this page — job links open through it and carry the application's resume context into the tab."
+                      : "The HexNinja browser extension wasn't detected on this page. Job links will open as plain browser tabs instead, with no resume context sent along."}
                   </Tooltip.Popup>
                 </Tooltip.Positioner>
               </Tooltip.Portal>

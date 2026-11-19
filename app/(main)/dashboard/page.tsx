@@ -79,14 +79,14 @@ function DailyBidChart({ title, data, color }: { title: string; data: { date: st
             dataKey="date"
             tickLine={false}
             axisLine={false}
-            tick={{ fontSize: 10, fill: "oklch(0.708 0 0)" }}
+            tick={{ fontSize: 10, fill: "oklch(0.71 0.025 272)" }}
             tickFormatter={(v: string) => new Date(v).toLocaleString("en-US", { weekday: "short", timeZone: "UTC" })}
           />
-          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "oklch(0.708 0 0)" }} allowDecimals={false} />
+          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "oklch(0.71 0.025 272)" }} allowDecimals={false} />
           <Tooltip
-            contentStyle={{ background: "oklch(0.205 0 0)", border: "1px solid oklch(1 0 0 / 10%)", borderRadius: 8, fontSize: 12 }}
-            labelStyle={{ color: "oklch(0.985 0 0)" }}
-            itemStyle={{ color: "oklch(0.708 0 0)" }}
+            contentStyle={{ background: "oklch(0.205 0.025 275)", border: "1px solid oklch(0.88 0.04 280 / 12%)", borderRadius: 10, boxShadow: "0 12px 32px -12px rgb(0 0 0 / 0.6)", fontSize: 12 }}
+            labelStyle={{ color: "oklch(0.97 0.006 275)" }}
+            itemStyle={{ color: "oklch(0.71 0.025 272)" }}
           />
           <Bar dataKey="count" fill={color} radius={[4, 4, 0, 0]} />
         </BarChart>
@@ -124,8 +124,8 @@ export default function DashboardPage() {
 
       <div className="flex-1 px-8 py-6 space-y-6 max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <DailyBidChart title="Dice Bid Count — This Week" data={data.diceCounts} color="oklch(0.577 0.245 27.325)" />
-          <DailyBidChart title="Other Bid Count — This Week" data={data.otherCounts} color="oklch(0.488 0.243 264.376)" />
+          <DailyBidChart title="Dice Bid Count — This Week" data={data.diceCounts} color="oklch(0.585 0.215 287)" />
+          <DailyBidChart title="Other Bid Count — This Week" data={data.otherCounts} color="oklch(0.78 0.13 205)" />
         </div>
 
         <ProfileStageTable rows={data.profileStageCounts} />

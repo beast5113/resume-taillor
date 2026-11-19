@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { BRAND_FAVICON } from "@/components/BrandMark";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Resume Tailor",
-  description: "Tailor your resume to any job description in seconds using AI",
+  title: "HexNinja",
+  description: "HexNinja — tailor your resume to any job description in seconds",
+  icons: { icon: BRAND_FAVICON },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
