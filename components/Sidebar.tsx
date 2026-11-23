@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -13,6 +14,7 @@ import {
   Users,
   Hammer,
   PackageCheck,
+  MessagesSquare,
 } from "lucide-react";
 import { logout } from "@/app/actions/logout";
 import { Button } from "@/components/ui/button";
@@ -22,6 +24,7 @@ const ALL_NAV = [
   { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard, roles: ["super_admin", "admin"] },
   { href: "/job-board",    label: "Job Board",    icon: Kanban,          roles: ["super_admin", "admin"] },
   { href: "/applications", label: "Applications", icon: Briefcase,       roles: ["super_admin", "admin", "assistant"] },
+  { href: "/chat",         label: "Chat",         icon: MessagesSquare,  roles: ["super_admin", "admin", "assistant"] },
   { href: "/prompts",      label: "Prompts",      icon: MessageSquare,   roles: ["super_admin", "admin"] },
   { href: "/templates",    label: "Templates",    icon: LayoutTemplate,  roles: ["super_admin", "admin"] },
   { href: "/builder",       label: "Builder",       icon: Hammer,          roles: ["super_admin", "admin"] },
@@ -38,6 +41,20 @@ interface SidebarProps {
 export default function Sidebar({ role, userName }: SidebarProps) {
   const pathname = usePathname();
   const nav = ALL_NAV.filter((item) => item.roles.includes(role));
+
+  // Unread chat badge — polled, and refreshed whenever the route changes.
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      fetch("/api/chat/unread")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { if (alive && d) setUnread(d.total ?? 0); })
+        .catch(() => {});
+    load();
+    const t = window.setInterval(load, 15000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, [pathname]);
 
   return (
     <aside className="relative w-56 shrink-0 bg-sidebar flex flex-col border-r border-sidebar-border">
@@ -87,6 +104,11 @@ export default function Sidebar({ role, userName }: SidebarProps) {
                 <Icon size={15} strokeWidth={2} />
               </span>
               {label}
+              {href === "/chat" && unread > 0 && (
+                <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-primary text-[10px] font-semibold text-primary-foreground flex items-center justify-center">
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
             </Link>
           );
         })}
