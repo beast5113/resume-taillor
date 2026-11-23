@@ -52,8 +52,14 @@ export default function Sidebar({ role, userName }: SidebarProps) {
         .then((d) => { if (alive && d) setUnread(d.total ?? 0); })
         .catch(() => {});
     load();
-    const t = window.setInterval(load, 15000);
-    return () => { alive = false; window.clearInterval(t); };
+    const t = window.setInterval(load, 10000);
+    const onLive = (e: Event) => setUnread(Number((e as CustomEvent).detail) || 0);
+    window.addEventListener("hexninja:chat-unread", onLive);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+      window.removeEventListener("hexninja:chat-unread", onLive);
+    };
   }, [pathname]);
 
   return (
@@ -102,10 +108,19 @@ export default function Sidebar({ role, userName }: SidebarProps) {
                 }`}
               >
                 <Icon size={15} strokeWidth={2} />
+                {href === "/chat" && unread > 0 && (
+                  <span className="absolute top-1.5 left-8 flex size-2">
+                    <span className="absolute inline-flex size-full rounded-full bg-red-500 opacity-75 animate-ping" />
+                    <span className="relative inline-flex size-2 rounded-full bg-red-500 ring-2 ring-sidebar" />
+                  </span>
+                )}
               </span>
               {label}
               {href === "/chat" && unread > 0 && (
-                <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-primary text-[10px] font-semibold text-primary-foreground flex items-center justify-center">
+                <span
+                  title={`${unread} unread message${unread === 1 ? "" : "s"}`}
+                  className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-red-500 text-[10px] font-semibold text-white flex items-center justify-center shadow-[0_0_12px_rgb(239_68_68/0.55)]"
+                >
                   {unread > 99 ? "99+" : unread}
                 </span>
               )}

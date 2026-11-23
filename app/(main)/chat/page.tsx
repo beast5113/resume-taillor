@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Hash, Loader2, MessagesSquare, Search, SendHorizontal } from "lucide-react";
+import { Check, Hash, Loader2, MessagesSquare, Search, SendHorizontal, Trash2, X } from "lucide-react";
 
 interface LastMessage { body: string; created_at: string; mine: boolean }
 interface ChatUser { id: string; name: string; role: string; unread: number; last: LastMessage | null }
@@ -53,7 +53,9 @@ function Avatar({ name, size = 36, general = false }: { name: string; size?: num
 }
 
 export default function ChatPage() {
-  const [me, setMe] = useState<{ userId: string; name: string } | null>(null);
+  const [me, setMe] = useState<{ userId: string; name: string; role: string } | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [convs, setConvs] = useState<Conversations | null>(null);
   const [active, setActive] = useState<string>(GENERAL);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -71,13 +73,19 @@ export default function ChatPage() {
 
   // Who am I
   useEffect(() => {
-    fetch("/api/me").then((r) => (r.ok ? r.json() : null)).then((d) => d && setMe({ userId: d.userId, name: d.name }));
+    fetch("/api/me").then((r) => (r.ok ? r.json() : null)).then((d) => d && setMe({ userId: d.userId, name: d.name, role: d.role }));
   }, []);
 
   // Conversation list (+ unread), polled
   const loadConversations = useCallback(async () => {
     const r = await fetch("/api/chat/conversations");
-    if (r.ok) setConvs(await r.json());
+    if (r.ok) {
+      const data: Conversations = await r.json();
+      setConvs(data);
+      // Keep the sidebar badge in sync instantly (it also polls on its own).
+      const total = data.general.unread + data.users.reduce((n, u) => n + u.unread, 0);
+      window.dispatchEvent(new CustomEvent("hexninja:chat-unread", { detail: total }));
+    }
     else if (r.status === 500) setError("Chat isn't set up yet — run migrations/002_chat.sql in Supabase.");
   }, []);
   useEffect(() => {
@@ -86,32 +94,28 @@ export default function ChatPage() {
     return () => window.clearInterval(t);
   }, [loadConversations]);
 
-  // Open a conversation: full load, then poll for newer messages only
+  // Open a conversation, then keep it fresh. Each poll reloads the latest
+  // messages (not just newer ones) so deletions disappear for everyone too.
   useEffect(() => {
     let cancelled = false;
-    let lastAt: string | null = null;
+    let signature = "";
     setMessages([]);
     setLoadingMessages(true);
+    setConfirmId(null);
     stickToBottom.current = true;
 
-    const merge = (incoming: Message[]) =>
-      setMessages((prev) => {
-        if (!incoming.length) return prev;
-        const seen = new Set(prev.map((m) => m.id));
-        const next = [...prev, ...incoming.filter((m) => !seen.has(m.id))];
-        next.sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
-        return next;
-      });
-
     const load = async (initial: boolean) => {
-      const url = `/api/chat/messages?with=${encodeURIComponent(active)}${!initial && lastAt ? `&after=${encodeURIComponent(lastAt)}` : ""}`;
-      const r = await fetch(url).catch(() => null);
+      const r = await fetch(`/api/chat/messages?with=${encodeURIComponent(active)}`).catch(() => null);
       if (cancelled || !r?.ok) { if (initial) setLoadingMessages(false); return; }
       const { messages: rows } = (await r.json()) as { messages: Message[] };
       if (cancelled) return;
-      if (rows.length) lastAt = rows[rows.length - 1].created_at;
-      if (initial) { setMessages(rows); setLoadingMessages(false); } else merge(rows);
-      if (rows.length && !initial) void loadConversations();
+      const next = rows.map((m) => m.id).join(",");
+      if (initial || next !== signature) {
+        setMessages(rows);
+        if (!initial) void loadConversations();
+      }
+      signature = next;
+      if (initial) setLoadingMessages(false);
     };
 
     void load(true).then(() => void loadConversations());
@@ -129,6 +133,23 @@ export default function ChatPage() {
   const onScroll = () => {
     const el = scrollRef.current;
     if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
+
+  const canDelete = (m: Message) => !!me && (m.sender_id === me.userId || me.role === "super_admin");
+
+  const removeMessage = async (id: string) => {
+    setDeletingId(id);
+    setError("");
+    const r = await fetch(`/api/chat/messages/${id}`, { method: "DELETE" }).catch(() => null);
+    setDeletingId(null);
+    setConfirmId(null);
+    if (!r || (!r.ok && r.status !== 404)) {
+      const j = r ? await r.json().catch(() => null) : null;
+      setError(j?.message ?? "Message could not be deleted.");
+      return;
+    }
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+    void loadConversations();
   };
 
   const send = async () => {
@@ -290,14 +311,48 @@ export default function ChatPage() {
                             {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           </p>
                         )}
-                        <div
-                          className={`px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words rounded-2xl ${
-                            mine
-                              ? "bg-primary text-primary-foreground rounded-br-md"
-                              : "bg-secondary text-secondary-foreground ring-1 ring-inset ring-white/[0.06] rounded-bl-md"
-                          }`}
-                        >
-                          {m.body}
+                        <div className={`group/msg flex items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+                          <div
+                            className={`px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words rounded-2xl transition-opacity ${
+                              deletingId === m.id ? "opacity-40" : ""
+                            } ${
+                              mine
+                                ? "bg-primary text-primary-foreground rounded-br-md"
+                                : "bg-secondary text-secondary-foreground ring-1 ring-inset ring-white/[0.06] rounded-bl-md"
+                            }`}
+                          >
+                            {m.body}
+                          </div>
+                          {canDelete(m) && (
+                            confirmId === m.id ? (
+                              <div className="shrink-0 flex items-center gap-1 rounded-lg bg-popover ring-1 ring-white/10 p-0.5 shadow-lg">
+                                <span className="px-1.5 text-[11px] text-muted-foreground">Delete?</span>
+                                <button
+                                  onClick={() => void removeMessage(m.id)}
+                                  disabled={deletingId === m.id}
+                                  className="size-6 rounded-md flex items-center justify-center text-red-400 hover:bg-red-500/15 disabled:opacity-50"
+                                  title="Delete message"
+                                >
+                                  {deletingId === m.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={13} />}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmId(null)}
+                                  className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground"
+                                  title="Cancel"
+                                >
+                                  <X size={13} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmId(m.id)}
+                                className="shrink-0 size-7 rounded-md flex items-center justify-center text-muted-foreground/60 opacity-0 group-hover/msg:opacity-100 focus-visible:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                                title={mine ? "Delete message" : "Delete message (super admin)"}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )
+                          )}
                         </div>
                       </div>
                     </div>
@@ -367,7 +422,7 @@ function ConversationRow({
         <div className="mt-0.5 flex items-center gap-2">
           <span className={`truncate text-xs ${unread ? "text-foreground/80" : "text-muted-foreground"}`}>{preview}</span>
           {unread > 0 && (
-            <span className="ml-auto shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-primary text-[10px] font-semibold text-primary-foreground flex items-center justify-center">
+            <span className="ml-auto shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-red-500 text-[10px] font-semibold text-white flex items-center justify-center">
               {unread > 99 ? "99+" : unread}
             </span>
           )}
