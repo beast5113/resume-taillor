@@ -72,3 +72,31 @@ export async function unreadCounts(me: string): Promise<Record<string, number>> 
   }
   return counts;
 }
+
+// ── Images ────────────────────────────────────────────────────────────────
+
+export const CHAT_IMAGE_BUCKET = "chat-images";
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+/** Identify an image by its magic bytes (never trust the file name / client MIME). */
+export function detectImageType(buf: Buffer): { mime: string; ext: string } | null {
+  if (buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))
+    return { mime: "image/png", ext: "png" };
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { mime: "image/jpeg", ext: "jpg" };
+  if (buf.length >= 6 && /^GIF8[79]a$/.test(buf.subarray(0, 6).toString("ascii"))) return { mime: "image/gif", ext: "gif" };
+  if (buf.length >= 12 && buf.subarray(0, 4).toString("ascii") === "RIFF" && buf.subarray(8, 12).toString("ascii") === "WEBP")
+    return { mime: "image/webp", ext: "webp" };
+  return null;
+}
+
+/** Best-effort removal of stored chat images (ignores nulls and failures). */
+export async function removeChatImages(paths: (string | null | undefined)[]): Promise<void> {
+  const list = paths.filter((p): p is string => !!p);
+  if (list.length) await supabase.storage.from(CHAT_IMAGE_BUCKET).remove(list).catch(() => {});
+}
+
+/** Whether `me` is a participant of the conversation a message belongs to. */
+export function isParticipant(me: string, conversationKey: string): boolean {
+  if (conversationKey === GENERAL) return true;
+  return otherParticipant(conversationKey, me) !== null;
+}

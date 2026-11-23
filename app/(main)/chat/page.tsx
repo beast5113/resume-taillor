@@ -1,12 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, CheckCircle2, Copy, Hash, ListChecks, Loader2, MessagesSquare, Search, SendHorizontal, Trash2, X } from "lucide-react";
+import { Check, CheckCircle2, Copy, ExternalLink, Hash, ImageIcon, ListChecks, Loader2, MessagesSquare, Paperclip, Search, SendHorizontal, Trash2, X } from "lucide-react";
 
 interface LastMessage { body: string; created_at: string; mine: boolean }
 interface ChatUser { id: string; name: string; role: string; unread: number; last: LastMessage | null }
 interface Conversations { general: { id: string; unread: number; last: LastMessage | null }; users: ChatUser[] }
-interface Message { id: string; sender_id: string; sender_name: string; body: string; created_at: string }
+interface Message { id: string; sender_id: string; sender_name: string; body: string; has_image?: boolean; created_at: string }
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const imageUrl = (id: string) => `/api/chat/images/${id}`;
+const formatBytes = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
 const GENERAL = "general";
 const MESSAGE_POLL_MS = 3000;
@@ -62,6 +67,11 @@ export default function ChatPage() {
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState("");
   const anchorIndex = useRef<number | null>(null);
+  // Images: pasted / picked / dropped attachment, and the full-size viewer
+  const [pending, setPending] = useState<{ file: File; url: string } | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const longPress = useRef<number | null>(null);
   const [convs, setConvs] = useState<Conversations | null>(null);
   const [active, setActive] = useState<string>(GENERAL);
@@ -190,9 +200,9 @@ export default function ChatPage() {
   const copyMessages = async (list: Message[]) => {
     const text =
       list.length === 1
-        ? list[0].body
+        ? list[0].body || "[Image]"
         : list
-            .map((m) => `${m.sender_name}, [${new Date(m.created_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}]\n${m.body}`)
+            .map((m) => `${m.sender_name}, [${new Date(m.created_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}]\n${m.has_image ? "[Image]" + (m.body ? " " : "") : ""}${m.body}`)
             .join("\n\n");
     try {
       await navigator.clipboard.writeText(text);
@@ -229,6 +239,10 @@ export default function ChatPage() {
   // Keyboard: Esc closes menu / leaves selection, Delete deletes, Ctrl+A selects all
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (lightbox) {
+        if (e.key === "Escape") setLightbox(null);
+        return;
+      }
       if (confirmIds) {
         if (e.key === "Escape") setConfirmIds(null);
         return;
@@ -251,7 +265,7 @@ export default function ChatPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [menu, selecting, confirmIds, deletableSelected, messages, exitSelection]);
+  }, [menu, selecting, confirmIds, deletableSelected, messages, exitSelection, lightbox]);
 
   // Close the context menu on any outside click / scroll / resize
   useEffect(() => {
@@ -274,17 +288,60 @@ export default function ChatPage() {
     setMenu({ x: Math.min(x, window.innerWidth - w - 8), y: Math.min(y, window.innerHeight - h - 8), id });
   };
 
+  /** Stage an image to send (from Ctrl+V, the paperclip, or drag & drop). */
+  const attach = useCallback((file: File | null | undefined) => {
+    if (!file) return;
+    if (!IMAGE_TYPES.includes(file.type)) { setError("Only PNG, JPEG, GIF or WebP images can be sent."); return; }
+    if (file.size > MAX_IMAGE_BYTES) { setError(`That image is ${formatBytes(file.size)} — the limit is 10 MB.`); return; }
+    setError("");
+    setPending((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return { file, url: URL.createObjectURL(file) };
+    });
+    inputRef.current?.focus();
+  }, []);
+
+  const clearPending = useCallback(() => {
+    setPending((prev) => { if (prev) URL.revokeObjectURL(prev.url); return null; });
+  }, []);
+
+  // Ctrl+V anywhere on the chat page (except the people search box) pastes a screenshot
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === "INPUT") return;
+      const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.kind === "file" && i.type.startsWith("image/"));
+      if (!item) return; // plain text paste behaves normally
+      e.preventDefault();
+      const blob = item.getAsFile();
+      if (!blob) return;
+      const ext = blob.type.split("/")[1] || "png";
+      attach(new File([blob], blob.name && blob.name !== "image.png" ? blob.name : `screenshot.${ext}`, { type: blob.type }));
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [attach]);
+
+  // Drop the staged image when switching conversations
+  useEffect(() => { clearPending(); }, [active, clearPending]);
+
   const send = async () => {
     const body = draft.trim();
-    if (!body || sending) return;
+    if ((!body && !pending) || sending) return;
     setSending(true);
     setError("");
     const to = activeRef.current;
-    const r = await fetch("/api/chat/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ to, body }),
-    }).catch(() => null);
+    let init: RequestInit;
+    if (pending) {
+      const form = new FormData();
+      form.append("to", to);
+      form.append("body", body);
+      form.append("image", pending.file);
+      init = { method: "POST", body: form };
+    } else {
+      init = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to, body }) };
+    }
+    const r = await fetch("/api/chat/messages", init).catch(() => null);
     setSending(false);
     if (!r?.ok) {
       const j = r ? await r.json().catch(() => null) : null;
@@ -293,6 +350,7 @@ export default function ChatPage() {
     }
     const { message } = (await r.json()) as { message: Message };
     setDraft("");
+    clearPending();
     stickToBottom.current = true;
     if (activeRef.current === to) setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
     void loadConversations();
@@ -382,7 +440,23 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Thread ────────────────────────────────────────────────── */}
-      <section className="flex-1 min-w-0 flex flex-col">
+      <section
+        className="relative flex-1 min-w-0 flex flex-col"
+        onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragOver(true); } }}
+        onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(false); }}
+        onDrop={(e) => {
+          if (!e.dataTransfer.files.length) return;
+          e.preventDefault();
+          setDragOver(false);
+          attach(e.dataTransfer.files[0]);
+        }}
+      >
+        {dragOver && (
+          <div className="pointer-events-none absolute inset-3 z-20 rounded-2xl border-2 border-dashed border-primary/60 bg-primary/[0.08] flex flex-col items-center justify-center gap-2 text-primary">
+            <ImageIcon size={28} />
+            <p className="text-sm font-medium">Drop image to send</p>
+          </div>
+        )}
         {selecting ? (
           <header className="h-16 shrink-0 px-4 flex items-center gap-2 border-b border-border bg-primary/[0.06]">
             <button
@@ -505,7 +579,9 @@ export default function ChatPage() {
                             </p>
                           )}
                           <div
-                            className={`px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words rounded-2xl ${
+                            className={`text-sm leading-relaxed whitespace-pre-wrap break-words rounded-2xl overflow-hidden ${
+                              m.has_image ? "p-1" : "px-3.5 py-2"
+                            } ${
                               menu?.id === m.id ? "ring-2 ring-primary/50" : ""
                             } ${
                               mine
@@ -513,7 +589,18 @@ export default function ChatPage() {
                                 : "bg-secondary text-secondary-foreground ring-1 ring-inset ring-white/[0.06] rounded-bl-md"
                             }`}
                           >
-                            {m.body}
+                            {m.has_image && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={imageUrl(m.id)}
+                                alt={m.body || "Image"}
+                                loading="lazy"
+                                draggable={false}
+                                onClick={(e) => { if (!selecting) { e.stopPropagation(); setLightbox(m.id); } }}
+                                className={`block max-w-[320px] max-h-[320px] w-auto h-auto rounded-xl bg-black/20 object-contain ${selecting ? "" : "cursor-zoom-in"}`}
+                              />
+                            )}
+                            {m.body && <div className={m.has_image ? "px-2.5 pt-1.5 pb-1" : ""}>{m.body}</div>}
                           </div>
                         </div>
                       </div>
@@ -527,7 +614,40 @@ export default function ChatPage() {
 
         <div className="shrink-0 px-6 pb-5 pt-2">
           {error && <p className="max-w-3xl mx-auto mb-2 text-xs text-destructive bg-destructive/10 ring-1 ring-inset ring-destructive/25 px-3 py-2 rounded-lg">{error}</p>}
+          {pending && (
+            <div className="max-w-3xl mx-auto mb-2 flex items-center gap-3 rounded-xl surface p-2 pr-3 animate-in fade-in-0 slide-in-from-bottom-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={pending.url} alt="Image to send" className="size-16 rounded-lg object-cover bg-black/30 ring-1 ring-white/10" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground truncate">{pending.file.name}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {formatBytes(pending.file.size)} · add a caption below, then press Enter
+                </p>
+              </div>
+              <button
+                onClick={clearPending}
+                className="size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent"
+                title="Remove image"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          )}
           <div className="max-w-3xl mx-auto flex items-end gap-2 rounded-xl surface p-2 focus-within:ring-2 focus-within:ring-ring/30">
+            <input
+              ref={fileRef}
+              type="file"
+              accept={IMAGE_TYPES.join(",")}
+              className="hidden"
+              onChange={(e) => { attach(e.target.files?.[0]); e.target.value = ""; }}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="size-9 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              title="Attach image (or paste with Ctrl+V)"
+            >
+              <Paperclip size={16} />
+            </button>
             <textarea
               ref={inputRef}
               rows={1}
@@ -540,12 +660,12 @@ export default function ChatPage() {
                   void send();
                 }
               }}
-              placeholder={`Message ${active === GENERAL ? "#General" : title}`}
+              placeholder={pending ? "Add a caption…" : `Message ${active === GENERAL ? "#General" : title}`}
               className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none max-h-40"
             />
             <button
               onClick={() => void send()}
-              disabled={!draft.trim() || sending}
+              disabled={(!draft.trim() && !pending) || sending}
               className="btn-primary size-9 p-0 shrink-0"
               title="Send (Enter)"
             >
@@ -553,7 +673,7 @@ export default function ChatPage() {
             </button>
           </div>
           <p className="max-w-3xl mx-auto mt-1.5 px-1 text-[10px] text-muted-foreground/50">
-            Enter to send · Shift + Enter for a new line · Right-click a message for more
+            Enter to send · Shift + Enter for a new line · Ctrl + V to paste a screenshot · Right-click a message for more
           </p>
         </div>
       </section>
@@ -619,6 +739,41 @@ export default function ChatPage() {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-size image viewer */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-6 animate-in fade-in-0 duration-150"
+          onClick={() => setLightbox(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageUrl(lightbox)}
+            alt="Full size"
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-full max-h-full rounded-lg shadow-2xl object-contain animate-in zoom-in-95 duration-150"
+          />
+          <div className="absolute top-4 right-4 flex gap-2">
+            <a
+              href={imageUrl(lightbox)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="size-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
+              title="Open in new tab"
+            >
+              <ExternalLink size={17} />
+            </a>
+            <button
+              onClick={() => setLightbox(null)}
+              className="size-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
+              title="Close (Esc)"
+            >
+              <X size={18} />
+            </button>
           </div>
         </div>
       )}
