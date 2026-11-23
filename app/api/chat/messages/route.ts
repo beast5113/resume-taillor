@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
+import { isSuperAdmin } from "@/lib/access";
 import { MAX_MESSAGE_LENGTH, markRead, resolveConversation } from "@/lib/chat";
 
 const PAGE = 100;
@@ -66,4 +67,33 @@ export async function POST(request: NextRequest) {
 
   await markRead(session.userId, conv.key);
   return NextResponse.json({ message: shape([data as Row])[0] }, { status: 201 });
+}
+
+/**
+ * DELETE { ids: string[] } — bulk delete (Telegram-style multi-select).
+ * Deletes the caller's own messages; the super admin may delete any.
+ * Messages the caller isn't allowed to delete are skipped, not errors.
+ */
+export async function DELETE(request: NextRequest) {
+  const session = await requireSession();
+  if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+
+  const payload = await request.json().catch(() => null);
+  const ids: string[] = Array.isArray(payload?.ids)
+    ? [...new Set((payload.ids as unknown[]).filter((x): x is string => typeof x === "string"))]
+    : [];
+  if (ids.length === 0) return NextResponse.json({ message: "ids array is required" }, { status: 400 });
+  if (ids.length > 500) return NextResponse.json({ message: "Too many messages at once (max 500)" }, { status: 400 });
+
+  let query = supabase.from("chat_messages").select("id").in("id", ids);
+  if (!isSuperAdmin(session)) query = query.eq("sender_id", session.userId);
+  const { data: allowed, error: selError } = await query;
+  if (selError) return NextResponse.json({ message: selError.message }, { status: 500 });
+
+  const deletable = (allowed ?? []).map((r) => r.id as string);
+  if (deletable.length) {
+    const { error } = await supabase.from("chat_messages").delete().in("id", deletable);
+    if (error) return NextResponse.json({ message: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ deleted: deletable, skipped: ids.length - deletable.length });
 }

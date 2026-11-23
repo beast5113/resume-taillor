@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Hash, Loader2, MessagesSquare, Search, SendHorizontal, Trash2, X } from "lucide-react";
+import { Check, CheckCircle2, Copy, Hash, ListChecks, Loader2, MessagesSquare, Search, SendHorizontal, Trash2, X } from "lucide-react";
 
 interface LastMessage { body: string; created_at: string; mine: boolean }
 interface ChatUser { id: string; name: string; role: string; unread: number; last: LastMessage | null }
@@ -54,8 +54,15 @@ function Avatar({ name, size = 36, general = false }: { name: string; size?: num
 
 export default function ChatPage() {
   const [me, setMe] = useState<{ userId: string; name: string; role: string } | null>(null);
-  const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Telegram-style selection & deletion
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(null);
+  const [confirmIds, setConfirmIds] = useState<string[] | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState("");
+  const anchorIndex = useRef<number | null>(null);
+  const longPress = useRef<number | null>(null);
   const [convs, setConvs] = useState<Conversations | null>(null);
   const [active, setActive] = useState<string>(GENERAL);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -101,7 +108,10 @@ export default function ChatPage() {
     let signature = "";
     setMessages([]);
     setLoadingMessages(true);
-    setConfirmId(null);
+    setSelecting(false);
+    setSelected(new Set());
+    setMenu(null);
+    setConfirmIds(null);
     stickToBottom.current = true;
 
     const load = async (initial: boolean) => {
@@ -135,21 +145,133 @@ export default function ChatPage() {
     if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
   };
 
-  const canDelete = (m: Message) => !!me && (m.sender_id === me.userId || me.role === "super_admin");
+  const canDelete = useCallback(
+    (m: Message) => !!me && (m.sender_id === me.userId || me.role === "super_admin"),
+    [me]
+  );
 
-  const removeMessage = async (id: string) => {
-    setDeletingId(id);
+  const flash = (text: string) => {
+    setToast(text);
+    window.setTimeout(() => setToast((t) => (t === text ? "" : t)), 2500);
+  };
+
+  const exitSelection = useCallback(() => {
+    setSelecting(false);
+    setSelected(new Set());
+    anchorIndex.current = null;
+  }, []);
+
+  const startSelection = (id?: string) => {
+    setSelecting(true);
+    setSelected(new Set(id ? [id] : []));
+    anchorIndex.current = id ? messages.findIndex((m) => m.id === id) : null;
+    setMenu(null);
+  };
+
+  /** Click toggles one message; Shift+click selects the whole range since the last click. */
+  const toggleSelect = (index: number, shift: boolean) => {
+    const id = messages[index]?.id;
+    if (!id) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (shift && anchorIndex.current !== null) {
+        const [a, b] = [anchorIndex.current, index].sort((x, y) => x - y);
+        for (let i = a; i <= b; i++) next.add(messages[i].id);
+      } else if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    anchorIndex.current = index;
+  };
+
+  const selectedMessages = useMemo(() => messages.filter((m) => selected.has(m.id)), [messages, selected]);
+  const deletableSelected = useMemo(() => selectedMessages.filter(canDelete), [selectedMessages, canDelete]);
+
+  const copyMessages = async (list: Message[]) => {
+    const text =
+      list.length === 1
+        ? list[0].body
+        : list
+            .map((m) => `${m.sender_name}, [${new Date(m.created_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}]\n${m.body}`)
+            .join("\n\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      flash(list.length === 1 ? "Message copied" : `${list.length} messages copied`);
+    } catch {
+      flash("Couldn't copy to clipboard");
+    }
+  };
+
+  const deleteMessages = async (ids: string[]) => {
+    if (!ids.length) return;
+    setDeleting(true);
     setError("");
-    const r = await fetch(`/api/chat/messages/${id}`, { method: "DELETE" }).catch(() => null);
-    setDeletingId(null);
-    setConfirmId(null);
-    if (!r || (!r.ok && r.status !== 404)) {
+    const r = await fetch("/api/chat/messages", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    }).catch(() => null);
+    setDeleting(false);
+    setConfirmIds(null);
+    if (!r?.ok) {
       const j = r ? await r.json().catch(() => null) : null;
-      setError(j?.message ?? "Message could not be deleted.");
+      setError(j?.message ?? "Messages could not be deleted.");
       return;
     }
-    setMessages((prev) => prev.filter((m) => m.id !== id));
+    const { deleted } = (await r.json()) as { deleted: string[] };
+    const gone = new Set(deleted);
+    setMessages((prev) => prev.filter((m) => !gone.has(m.id)));
+    exitSelection();
+    flash(deleted.length === 1 ? "Message deleted" : `${deleted.length} messages deleted`);
     void loadConversations();
+  };
+
+  // Keyboard: Esc closes menu / leaves selection, Delete deletes, Ctrl+A selects all
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (confirmIds) {
+        if (e.key === "Escape") setConfirmIds(null);
+        return;
+      }
+      if (e.key === "Escape") {
+        if (menu) setMenu(null);
+        else if (selecting) exitSelection();
+        return;
+      }
+      if (!selecting) return;
+      const typing = (e.target as HTMLElement)?.tagName === "TEXTAREA" || (e.target as HTMLElement)?.tagName === "INPUT";
+      if (typing) return;
+      if ((e.key === "Delete" || e.key === "Backspace") && deletableSelected.length) {
+        e.preventDefault();
+        setConfirmIds(deletableSelected.map((m) => m.id));
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        setSelected(new Set(messages.map((m) => m.id)));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menu, selecting, confirmIds, deletableSelected, messages, exitSelection]);
+
+  // Close the context menu on any outside click / scroll / resize
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("resize", close);
+    scrollRef.current?.addEventListener("scroll", close);
+    const el = scrollRef.current;
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("resize", close);
+      el?.removeEventListener("scroll", close);
+    };
+  }, [menu]);
+
+  const openMenu = (x: number, y: number, id: string) => {
+    // keep the menu on-screen
+    const w = 190, h = 140;
+    setMenu({ x: Math.min(x, window.innerWidth - w - 8), y: Math.min(y, window.innerHeight - h - 8), id });
   };
 
   const send = async () => {
@@ -261,13 +383,61 @@ export default function ChatPage() {
 
       {/* ── Thread ────────────────────────────────────────────────── */}
       <section className="flex-1 min-w-0 flex flex-col">
-        <header className="h-16 shrink-0 px-6 flex items-center gap-3 border-b border-border">
-          <Avatar name={title} general={active === GENERAL} size={34} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">{title}</p>
-            <p className="text-[11px] text-muted-foreground">{subtitle}</p>
-          </div>
-        </header>
+        {selecting ? (
+          <header className="h-16 shrink-0 px-4 flex items-center gap-2 border-b border-border bg-primary/[0.06]">
+            <button
+              onClick={exitSelection}
+              className="size-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent"
+              title="Cancel (Esc)"
+            >
+              <X size={17} />
+            </button>
+            <p className="text-sm font-semibold text-foreground">
+              {selectedMessages.length} selected
+            </p>
+            <button
+              onClick={() => setSelected(new Set(messages.map((m) => m.id)))}
+              className="ml-2 text-xs text-muted-foreground hover:text-foreground"
+              title="Select all (Ctrl+A)"
+            >
+              Select all
+            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => void copyMessages(selectedMessages)}
+                disabled={!selectedMessages.length}
+                className="btn-secondary h-9 px-3 text-xs"
+              >
+                <Copy size={14} /> Copy
+              </button>
+              <button
+                onClick={() => setConfirmIds(deletableSelected.map((m) => m.id))}
+                disabled={!deletableSelected.length}
+                className="h-9 px-3 inline-flex items-center gap-2 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                title="Delete (Del)"
+              >
+                <Trash2 size={14} /> Delete{deletableSelected.length ? ` ${deletableSelected.length}` : ""}
+              </button>
+            </div>
+          </header>
+        ) : (
+          <header className="h-16 shrink-0 px-6 flex items-center gap-3 border-b border-border">
+            <Avatar name={title} general={active === GENERAL} size={34} />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">{title}</p>
+              <p className="text-[11px] text-muted-foreground">{subtitle}</p>
+            </div>
+            {messages.length > 0 && (
+              <button
+                onClick={() => startSelection()}
+                className="ml-auto h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                title="Select messages"
+              >
+                <ListChecks size={15} /> Select
+              </button>
+            )}
+          </header>
+        )}
 
         <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-6 py-5">
           {loadingMessages ? (
@@ -300,21 +470,43 @@ export default function ChatPage() {
                         <div className="h-px flex-1 bg-border" />
                       </div>
                     )}
-                    <div className={`flex gap-2.5 ${mine ? "justify-end" : "justify-start"} ${grouped ? "" : "pt-2"}`}>
-                      {!mine && (
-                        <div className="w-8 shrink-0">{!grouped && <Avatar name={m.sender_name} size={32} />}</div>
+                    <div
+                      onClick={(e) => { if (selecting) { e.preventDefault(); toggleSelect(i, e.shiftKey); } }}
+                      onContextMenu={(e) => { e.preventDefault(); if (!selecting) openMenu(e.clientX, e.clientY, m.id); }}
+                      onTouchStart={(e) => {
+                        if (selecting) return;
+                        const t = e.touches[0];
+                        longPress.current = window.setTimeout(() => openMenu(t.clientX, t.clientY, m.id), 450);
+                      }}
+                      onTouchEnd={() => { if (longPress.current) window.clearTimeout(longPress.current); }}
+                      onTouchMove={() => { if (longPress.current) window.clearTimeout(longPress.current); }}
+                      className={`relative -mx-3 px-3 rounded-xl flex items-start gap-2.5 transition-colors ${grouped ? "py-0.5" : "pt-2 pb-0.5"} ${
+                        selecting ? "cursor-pointer select-none hover:bg-white/[0.03]" : ""
+                      } ${selected.has(m.id) ? "bg-primary/[0.09] hover:bg-primary/[0.12]" : ""}`}
+                    >
+                      {selecting && (
+                        <span className="self-center shrink-0 w-6 flex justify-center">
+                          {selected.has(m.id) ? (
+                            <CheckCircle2 size={20} className="text-primary fill-primary/20" />
+                          ) : (
+                            <span className="size-[18px] rounded-full border-2 border-muted-foreground/40" />
+                          )}
+                        </span>
                       )}
-                      <div className={`max-w-[72%] flex flex-col ${mine ? "items-end" : "items-start"}`}>
-                        {!grouped && (
-                          <p className="mb-1 px-1 text-[11px] text-muted-foreground">
-                            {!mine && <span className="font-medium text-foreground/80 mr-1.5">{m.sender_name}</span>}
-                            {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </p>
+                      <div className={`flex-1 min-w-0 flex gap-2.5 ${mine ? "justify-end" : "justify-start"}`}>
+                        {!mine && (
+                          <div className="w-8 shrink-0">{!grouped && <Avatar name={m.sender_name} size={32} />}</div>
                         )}
-                        <div className={`group/msg flex items-center gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+                        <div className={`max-w-[72%] flex flex-col ${mine ? "items-end" : "items-start"}`}>
+                          {!grouped && (
+                            <p className="mb-1 px-1 text-[11px] text-muted-foreground">
+                              {!mine && <span className="font-medium text-foreground/80 mr-1.5">{m.sender_name}</span>}
+                              {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          )}
                           <div
-                            className={`px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words rounded-2xl transition-opacity ${
-                              deletingId === m.id ? "opacity-40" : ""
+                            className={`px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words rounded-2xl ${
+                              menu?.id === m.id ? "ring-2 ring-primary/50" : ""
                             } ${
                               mine
                                 ? "bg-primary text-primary-foreground rounded-br-md"
@@ -323,36 +515,6 @@ export default function ChatPage() {
                           >
                             {m.body}
                           </div>
-                          {canDelete(m) && (
-                            confirmId === m.id ? (
-                              <div className="shrink-0 flex items-center gap-1 rounded-lg bg-popover ring-1 ring-white/10 p-0.5 shadow-lg">
-                                <span className="px-1.5 text-[11px] text-muted-foreground">Delete?</span>
-                                <button
-                                  onClick={() => void removeMessage(m.id)}
-                                  disabled={deletingId === m.id}
-                                  className="size-6 rounded-md flex items-center justify-center text-red-400 hover:bg-red-500/15 disabled:opacity-50"
-                                  title="Delete message"
-                                >
-                                  {deletingId === m.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={13} />}
-                                </button>
-                                <button
-                                  onClick={() => setConfirmId(null)}
-                                  className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground"
-                                  title="Cancel"
-                                >
-                                  <X size={13} />
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => setConfirmId(m.id)}
-                                className="shrink-0 size-7 rounded-md flex items-center justify-center text-muted-foreground/60 opacity-0 group-hover/msg:opacity-100 focus-visible:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                                title={mine ? "Delete message" : "Delete message (super admin)"}
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            )
-                          )}
                         </div>
                       </div>
                     </div>
@@ -391,10 +553,82 @@ export default function ChatPage() {
             </button>
           </div>
           <p className="max-w-3xl mx-auto mt-1.5 px-1 text-[10px] text-muted-foreground/50">
-            Enter to send · Shift + Enter for a new line
+            Enter to send · Shift + Enter for a new line · Right-click a message for more
           </p>
         </div>
       </section>
+
+      {/* Context menu (right-click / long-press) */}
+      {menu && (() => {
+        const m = messages.find((x) => x.id === menu.id);
+        if (!m) return null;
+        return (
+          <div
+            style={{ left: menu.x, top: menu.y }}
+            onClick={(e) => e.stopPropagation()}
+            className="fixed z-50 w-48 rounded-xl bg-popover p-1 shadow-2xl shadow-black/50 ring-1 ring-white/10 animate-in fade-in-0 zoom-in-95 duration-100"
+          >
+            <MenuItem icon={<ListChecks size={15} />} label="Select" onClick={() => startSelection(m.id)} />
+            <MenuItem icon={<Copy size={15} />} label="Copy text" onClick={() => { setMenu(null); void copyMessages([m]); }} />
+            {canDelete(m) && (
+              <>
+                <div className="my-1 h-px bg-border" />
+                <MenuItem danger icon={<Trash2 size={15} />} label="Delete" onClick={() => { setMenu(null); setConfirmIds([m.id]); }} />
+              </>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Delete confirmation */}
+      {confirmIds && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[2px] p-4 animate-in fade-in-0 duration-150"
+          onClick={() => !deleting && setConfirmIds(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-2xl surface p-6 animate-in zoom-in-95 duration-150"
+          >
+            <div className="size-11 rounded-full bg-red-500/12 ring-1 ring-red-500/25 flex items-center justify-center text-red-400 mb-4">
+              <Trash2 size={18} />
+            </div>
+            <h2 className="text-base font-semibold text-foreground">
+              Delete {confirmIds.length === 1 ? "message" : `${confirmIds.length} messages`}?
+            </h2>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              {confirmIds.length === 1 ? "It" : "They"}’ll be removed for everyone in this chat. This can’t be undone.
+            </p>
+            {selecting && selectedMessages.length > deletableSelected.length && (
+              <p className="mt-3 text-xs text-muted-foreground bg-white/[0.04] rounded-lg px-3 py-2">
+                {selectedMessages.length - deletableSelected.length} selected message
+                {selectedMessages.length - deletableSelected.length === 1 ? " was" : "s were"} sent by someone else and will be kept.
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button onClick={() => setConfirmIds(null)} disabled={deleting} className="btn-secondary h-9">
+                Cancel
+              </button>
+              <button
+                onClick={() => void deleteMessages(confirmIds)}
+                disabled={deleting}
+                autoFocus
+                className="h-9 px-4 inline-flex items-center gap-2 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 disabled:opacity-60 transition-colors"
+              >
+                {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full bg-popover px-4 py-2 text-sm text-foreground shadow-xl ring-1 ring-white/10 animate-in fade-in-0 slide-in-from-bottom-2">
+          <Check size={14} className="text-emerald-400" /> {toast}
+        </div>
+      )}
     </div>
   );
 }
@@ -428,6 +662,20 @@ function ConversationRow({
           )}
         </div>
       </div>
+    </button>
+  );
+}
+
+function MenuItem({ icon, label, onClick, danger = false }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+        danger ? "text-red-400 hover:bg-red-500/12" : "text-foreground hover:bg-accent"
+      }`}
+    >
+      <span className={danger ? "" : "text-muted-foreground"}>{icon}</span>
+      {label}
     </button>
   );
 }
