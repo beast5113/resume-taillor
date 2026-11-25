@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { extractTemplateVariables } from "@/lib/docxTemplater";
-import { requireSession } from "@/lib/auth";
+import { requireAnyAuth, requireSession } from "@/lib/auth";
 import { isAdminRole, isSuperAdmin, visibleTemplateIds, canManageOwned, profileOwnerId } from "@/lib/access";
 
 const COVER_LETTER_VARS = new Set(["date", "letter"]);
 
-export async function GET() {
-  const session = await requireSession();
+export async function GET(request: NextRequest) {
+  // Bearer too, not just the web cookie: the AutoGen extension lists templates with its token.
+  const session = await requireAnyAuth(request);
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   let query = supabase
